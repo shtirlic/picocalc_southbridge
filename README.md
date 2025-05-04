@@ -7,6 +7,7 @@ The main differences with the original are followings:
 
 - drastic reduction in the STM32's electricity consumption when running (~3.5 mA),
 - removed stm32duino dependencies (use STM32HAL instead, maybe I'll switch to libopencm3 someday...),
+- clean up (in progress) to reduce binary size (~25 KB) and allow more features to be implemented,
 - added configuration saving solution (using internal flash, including backlight option),
 - rewriten or added some debug UART interface message,
 - lighten AXP2101 PMIC driver.

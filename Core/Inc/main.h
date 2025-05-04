@@ -1,18 +1,12 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file           : main.h
-  * @brief          : Header for main.c file.
-  *                   This file contains the common defines of the application.
-  ******************************************************************************
-  * @attention
   *
-  * Copyright (c) 2025 STMicroelectronics.
+  * Copyright (c) 2025 C.ARE (JackCarterSmith).
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
   * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -42,7 +36,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stm32f1xx_ll_tim.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -52,7 +46,14 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim3;
+extern I2C_HandleTypeDef hi2c2;
 
+extern volatile uint32_t systicks_counter;
+extern volatile uint8_t pmu_irq;
+extern uint8_t io_matrix[9];
+extern uint8_t js_bits;
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
@@ -66,7 +67,9 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+__STATIC_INLINE uint32_t uptime_ms(void) { return systicks_counter; }
 
+void flash_one_time(uint32_t ts, uint8_t restore_status);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -155,7 +158,10 @@ void Error_Handler(void);
 #define PICO_SDA_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+#define EEPROM_VAR_ID	(0)		// 16b: Init ID: 0xCA1C
+#define EEPROM_VAR_CFG	(1)		// 16b: 0x00 + CFG reg
+#define EEPROM_VAR_KBD	(2)		// 16b: DEB + FRQ regs
+#define EEPROM_VAR_BCKL	(3)		// 16b: LCD + KBD backlight step indice
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

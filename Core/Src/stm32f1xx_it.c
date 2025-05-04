@@ -213,7 +213,7 @@ void EXTI9_5_IRQHandler(void)
   {
     LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_9);
     /* USER CODE BEGIN LL_EXTI_LINE_9 */
-
+    pmu_irq = 1;
     /* USER CODE END LL_EXTI_LINE_9 */
   }
   /* USER CODE BEGIN EXTI9_5_IRQn 1 */
