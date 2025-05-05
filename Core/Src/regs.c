@@ -103,6 +103,7 @@ uint32_t reg_check_and_save_eeprom(void) {
 }
 
 void reg_sync(void) {
+	// Save user registers in EEPROM if unsynced every 1.5s
 	if (uptime_ms() > (eeprom_refresh_counter + 1500)) {
 		reg_check_and_save_eeprom();
 		eeprom_refresh_counter = uptime_ms();

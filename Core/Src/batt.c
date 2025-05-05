@@ -13,14 +13,15 @@ void show_bat_segs(void) {
 	if (AXP2101_getBatteryPercent(&pcnt) != HAL_OK)
 		return;
 	uint8_t prev_state = (LL_GPIO_IsOutputPinSet(SYS_LED_GPIO_Port, SYS_LED_Pin) == 0);
-	uint8_t blink_cnt;
+	uint8_t blink_cnt = 1;
 
-	if(pcnt > 0 && pcnt < 33)
-		blink_cnt = 1;
-	else if(pcnt >= 33 && pcnt < 66)
-		blink_cnt = 1;
+	//if(pcnt > 0 && pcnt < 33)
+	//	blink_cnt = 1;
+	//else
+	if(pcnt >= 33 && pcnt < 66)
+		blink_cnt = 2;
 	else if(pcnt >= 66 && pcnt <= 100)
-		blink_cnt = 1;
+		blink_cnt = 3;
 
 	flash_one_time(blink_cnt, prev_state);
 
@@ -34,7 +35,7 @@ void low_bat(void) {
 	if (AXP2101_getBatteryPercent(&pcnt) != HAL_OK)
 		return;
 
-	if ((pcnt >= 0) && (pcnt <= (uint8_t)LOW_BAT_VAL)) {
+	if ((pcnt != 0) && (pcnt <= (uint8_t)LOW_BAT_VAL)) {
 		low_bat_count++;
 		LL_GPIO_SetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
 

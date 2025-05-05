@@ -58,10 +58,10 @@ EEPROM_Result EEPROM_Init()
 		EraseDefinitions.NbPages = 2;
 		uint32_t PageError;
 
-		result = HAL_FLASHEx_Erase(&EraseDefinitions, &PageError);
+		result = (EEPROM_Result)HAL_FLASHEx_Erase(&EraseDefinitions, &PageError);
 		if (result != EEPROM_SUCCESS) return result;
 
-		result = HAL_FLASH_Program(EEPROM_SIZE16, EEPROM_PAGE0, EEPROM_VALID);
+		result = (EEPROM_Result)HAL_FLASH_Program(EEPROM_SIZE16, EEPROM_PAGE0, EEPROM_VALID);
 		if (result != EEPROM_SUCCESS) return result;
 
 		PageStatus0 = EEPROM_VALID;
@@ -159,7 +159,7 @@ EEPROM_Result EEPROM_WriteVariable(uint16_t VariableName, EEPROM_Value Value, ui
 	uint32_t PageEndAddress = WritingPage + FLASH_PAGE_SIZE;
 
 	//calculate memory usage of variable
-	uint8_t Bytes = 2 + (1 << Size);
+	uint8_t Bytes = (uint8_t)(2 + (1 << Size));
 	if (Size == EEPROM_SIZE_DELETED) Bytes = 2;
 
 	//check if enough free space or page full
@@ -169,8 +169,8 @@ EEPROM_Result EEPROM_WriteVariable(uint16_t VariableName, EEPROM_Value Value, ui
 		uint16_t RequiredMemory = 2;
 		for (uint16_t i = 0; i < EEPROM_VARIABLE_COUNT; i++)
 		{
-			if (i == VariableName) RequiredMemory += 2 + (1 << Size);
-			else if (EEPROM_SizeTable[i] != EEPROM_SIZE_DELETED) RequiredMemory += 2 + (1 << EEPROM_SizeTable[i]);
+			if (i == VariableName) RequiredMemory += (uint16_t)(2 + (1 << Size));
+			else if (EEPROM_SizeTable[i] != EEPROM_SIZE_DELETED) RequiredMemory += (uint16_t)(2 + (1 << EEPROM_SizeTable[i]));
 		}
 		if (RequiredMemory > FLASH_PAGE_SIZE) return EEPROM_FULL;
 
@@ -196,17 +196,17 @@ EEPROM_Result EEPROM_WriteVariable(uint16_t VariableName, EEPROM_Value Value, ui
 		//write variable value
 		if (Size != EEPROM_SIZE_DELETED)
 		{
-			result = HAL_FLASH_Program(Size, EEPROM_NextIndex + 2, Value.uInt64);
+			result = (EEPROM_Result)HAL_FLASH_Program(Size, EEPROM_NextIndex + 2, Value.uInt64);
 			if (result != EEPROM_SUCCESS) return result;
 		}
 
 		//create and write variable header (size and name)
-		uint16_t VariableHeader = VariableName + (Size << 14);
-		result = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, EEPROM_NextIndex, VariableHeader);
+		uint16_t VariableHeader = (uint16_t)(VariableName + (Size << 14));
+		result = (EEPROM_Result)HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, EEPROM_NextIndex, VariableHeader);
 		if (result != EEPROM_SUCCESS) return result;
 
 		//update index & size table
-		EEPROM_Index[VariableName] = EEPROM_NextIndex + 2 - EEPROM_START_ADDRESS;
+		EEPROM_Index[VariableName] = (uint16_t)(EEPROM_NextIndex + 2 - EEPROM_START_ADDRESS);
 		EEPROM_SizeTable[VariableName] = Size;
 		if (Size == EEPROM_SIZE_DELETED) EEPROM_Index[VariableName] = 0;
 
@@ -246,8 +246,8 @@ static EEPROM_Result EEPROM_PageTransfer()
 	EEPROM_Value Value;
 
 	//get start & end address of valid page (source) (as offset to EEPROM start)
-	uint16_t StartAddress = EEPROM_ValidPage - EEPROM_START_ADDRESS;
-	uint16_t EndAddress = EEPROM_ValidPage - EEPROM_START_ADDRESS + FLASH_PAGE_SIZE;
+	uint16_t StartAddress = (uint16_t)(EEPROM_ValidPage - EEPROM_START_ADDRESS);
+	uint16_t EndAddress = (uint16_t)(EEPROM_ValidPage - EEPROM_START_ADDRESS + FLASH_PAGE_SIZE);
 
 	//copy each variable
 	for (uint16_t i = 0; i < EEPROM_VARIABLE_COUNT; i++)
@@ -296,8 +296,8 @@ static EEPROM_Result EEPROM_SetPageStatus(EEPROM_Page Page, EEPROM_PageStatus Pa
 	if (PageStatus == EEPROM_ERASED)
 	{
 		//remove every variable from index, that is stored on erase page
-		uint16_t StartAddress = Page - EEPROM_START_ADDRESS;
-		uint16_t EndAddress = Page - EEPROM_START_ADDRESS + FLASH_PAGE_SIZE;
+		uint16_t StartAddress = (uint16_t)(Page - EEPROM_START_ADDRESS);
+		uint16_t EndAddress = (uint16_t)(Page - EEPROM_START_ADDRESS + FLASH_PAGE_SIZE);
 		for (uint16_t i = 0; i < EEPROM_VARIABLE_COUNT; i++)
 		{
 			if (StartAddress < EEPROM_Index[i] && EEPROM_Index[i] < EndAddress) EEPROM_Index[i] = 0;
@@ -312,14 +312,14 @@ static EEPROM_Result EEPROM_SetPageStatus(EEPROM_Page Page, EEPROM_PageStatus Pa
 		uint32_t PageError;
 
 		//erase page
-		result = HAL_FLASHEx_Erase(&EraseDefinitions, &PageError);
+		result = (EEPROM_Result)HAL_FLASHEx_Erase(&EraseDefinitions, &PageError);
 		if (result != EEPROM_SUCCESS) return result;
 	}
 
 	//else write status to flash
 	else
 	{
-		result = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, Page, PageStatus);
+		result = (EEPROM_Result)HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, Page, PageStatus);
 		if (result != EEPROM_SUCCESS) return result;
 	}
 
@@ -397,14 +397,13 @@ static EEPROM_Result EEPROM_PageToIndex(EEPROM_Page Page)
 		else
 		{
 			//get size code
-			SizeCode = VariableHeader >> 14;
+			SizeCode = (uint8_t)(VariableHeader >> 14);
 
 			//check for valid name (VARIABLE_COUNT might have been reduced between builds, but old variables are still in flash)
-			Name = VariableHeader & 0b0011111111111111;
-			if (Name < EEPROM_VARIABLE_COUNT)
-			{
+			Name = VariableHeader & 0x3FFF;
+			if (Name < EEPROM_VARIABLE_COUNT) {
 				//if everything valid, update the index and the size table
-				EEPROM_Index[Name] = Address + 2 - EEPROM_START_ADDRESS;
+				EEPROM_Index[Name] = (uint16_t)(Address + 2 - EEPROM_START_ADDRESS);
 				EEPROM_SizeTable[Name] = SizeCode;
 				if (SizeCode == EEPROM_SIZE_DELETED) EEPROM_Index[Name] = 0;
 			}

@@ -46,19 +46,19 @@ enum key_state {
 #define KEY_MOD_SYM     0xA4
 #define KEY_MOD_CTRL    0xA5
 
-#define KEY_ESC       0xB1
-#define KEY_UP        0xb5
-#define KEY_DOWN      0xb6
-#define KEY_LEFT      0xb4
-#define KEY_RIGHT     0xb7
+#define KEY_ESC         0xB1
+#define KEY_UP          0xb5
+#define KEY_DOWN        0xb6
+#define KEY_LEFT        0xb4
+#define KEY_RIGHT       0xb7
 
-#define KEY_BREAK     0xd0 // == KEY_PAUSE
-#define KEY_INSERT    0xD1
-#define KEY_HOME      0xD2
-#define KEY_DEL       0xD4
-#define KEY_END       0xD5
-#define KEY_PAGE_UP    0xd6
-#define KEY_PAGE_DOWN  0xd7
+#define KEY_BREAK       0xd0 // == KEY_PAUSE
+#define KEY_INSERT      0xD1
+#define KEY_HOME        0xD2
+#define KEY_DEL         0xD4
+#define KEY_END         0xD5
+#define KEY_PAGE_UP     0xd6
+#define KEY_PAGE_DOWN   0xd7
 
 #define KEY_CAPS_LOCK   0xC1
 

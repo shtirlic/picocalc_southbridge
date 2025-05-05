@@ -197,11 +197,9 @@ extern void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			const uint8_t is_write = (uint8_t)(i2cs_r_buff[0] & (1 << 7));
 			const uint8_t reg = (uint8_t)(i2cs_r_buff[0] & ~(1 << 7));
 
-			if (reg == REG_ID_BKL) {	// We wait an another byte for these registers
-				if (is_write) {
-					HAL_I2C_Slave_Sequential_Receive_IT(hi2c, i2cs_r_buff + i2cs_r_idx, 1, I2C_NEXT_FRAME);	// This write the second received byte to i2cs_r_buff[1]
-				}
-			} else if (reg == REG_ID_BK2) {
+			// We wait an another byte for these registers
+			if (reg == REG_ID_BKL ||
+				reg == REG_ID_BK2) {
 				if (is_write) {
 					HAL_I2C_Slave_Sequential_Receive_IT(hi2c, i2cs_r_buff + i2cs_r_idx, 1, I2C_NEXT_FRAME);	// This write the second received byte to i2cs_r_buff[1]
 				}
@@ -209,21 +207,6 @@ extern void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 		}
 	}
 }
-
-/*extern void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
-	if (hi2c == &hi2c1) {
-		if (i2cs_state == I2CS_STATE_REG_ANSWER) {
-			if (++i2cs_w_idx < i2cs_w_len) {
-				HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, i2cs_w_buff + i2cs_w_idx, 1, I2C_NEXT_FRAME);	// This write the next answer byte on I2C bus
-			} else {
-				i2cs_w_buff[31] = 0;
-				HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, &i2cs_w_buff[31], 1, I2C_NEXT_FRAME);	// send a 0 value to avoid stalling - TODO: usefull? can we use I2C_LAST_FRAME instead?
-			}
-
-			i2cs_rearm_counter = 0;
-		}
-	}
-}*/
 
 extern void HAL_I2C_ListenCpltCallback (I2C_HandleTypeDef *hi2c) {
 	if (hi2c == &hi2c1) {
@@ -238,6 +221,7 @@ extern void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
 	if (hi2c == &hi2c1)
 		if (HAL_I2C_GetError(hi2c) != HAL_I2C_ERROR_AF)
 			Error_Handler();	//TODO: replace with dedicated, non-blocking, error handler
+			// Actually this will trigger the watchdog and restart the system... That can ruin the day of the user.
 }
 
 #ifdef DEBUG
@@ -387,7 +371,7 @@ int main(void)
   // Enable speaker Amp. power
   LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
 
-  HAL_Delay(1000);
+  HAL_Delay(500);
   lcd_backlight_on();
 
 	// It is necessary to disable the detection function of the TS pin on the
@@ -446,13 +430,11 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	// Save user registers in EEPROM if unsynced every 2.5s
-	reg_sync();
-
 	// Re-arm I2CS in case of lost master signal
 	if (i2cs_state != I2CS_STATE_IDLE && i2cs_rearm_counter > I2CS_REARM_TIMEOUT)
 		i2cs_state = I2CS_STATE_IDLE;
 
+	reg_sync();
 	check_pmu_int();
 	keyboard_process();
 	hw_check_HP_presence();

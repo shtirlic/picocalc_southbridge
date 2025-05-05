@@ -266,42 +266,39 @@ typedef enum __xpowers_chg_led_mode {
     XPOWERS_CHG_LED_CTRL_CHG,    // The charging indicator is controlled by the charger
 } xpowers_chg_led_mode_t;
 
-/**
- * @brief axp2101 interrupt control mask parameters.
+/*
+ * ------------- axp2101 interrupt control mask -------------
  */
-typedef enum __xpowers_axp2101_irq {
-    //! IRQ1 REG 40H
-    XPOWERS_AXP2101_BAT_NOR_UNDER_TEMP_IRQ   = _BV(0),   // Battery Under Temperature in Work
-    XPOWERS_AXP2101_BAT_NOR_OVER_TEMP_IRQ    = _BV(1),   // Battery Over Temperature in Work mode
-    XPOWERS_AXP2101_BAT_CHG_UNDER_TEMP_IRQ   = _BV(2),   // Battery Under Temperature in Charge mode IRQ(bcut_irq)
-    XPOWERS_AXP2101_BAT_CHG_OVER_TEMP_IRQ    = _BV(3),   // Battery Over Temperature in Charge mode IRQ(bcot_irq) enable
-    XPOWERS_AXP2101_GAUGE_NEW_SOC_IRQ        = _BV(4),   // Gauge New SOC IRQ(lowsoc_irq) enable ???
-    XPOWERS_AXP2101_WDT_TIMEOUT_IRQ          = _BV(5),   // Gauge Watchdog Timeout IRQ(gwdt_irq) enable
-    XPOWERS_AXP2101_WARNING_LEVEL1_IRQ       = _BV(6),   // SOC drop to Warning Level1 IRQ(socwl1_irq) enable
-    XPOWERS_AXP2101_WARNING_LEVEL2_IRQ       = _BV(7),   // SOC drop to Warning Level2 IRQ(socwl2_irq) enable
+//! IRQ1 REG 40H
+#define XPOWERS_AXP2101_BAT_NOR_UNDER_TEMP_IRQ   _BV(0)   //!< Battery Under Temperature in Work
+#define XPOWERS_AXP2101_BAT_NOR_OVER_TEMP_IRQ    _BV(1)   //!< Battery Over Temperature in Work mode
+#define XPOWERS_AXP2101_BAT_CHG_UNDER_TEMP_IRQ   _BV(2)   //!< Battery Under Temperature in Charge mode IRQ(bcut_irq)
+#define XPOWERS_AXP2101_BAT_CHG_OVER_TEMP_IRQ    _BV(3)   //!< Battery Over Temperature in Charge mode IRQ(bcot_irq) enable
+#define XPOWERS_AXP2101_GAUGE_NEW_SOC_IRQ        _BV(4)   //!< Gauge New SOC IRQ(lowsoc_irq) enable ???
+#define XPOWERS_AXP2101_WDT_TIMEOUT_IRQ          _BV(5)   //!< Gauge Watchdog Timeout IRQ(gwdt_irq) enable
+#define XPOWERS_AXP2101_WARNING_LEVEL1_IRQ       _BV(6)   //!< SOC drop to Warning Level1 IRQ(socwl1_irq) enable
+#define XPOWERS_AXP2101_WARNING_LEVEL2_IRQ       _BV(7)   //!< SOC drop to Warning Level2 IRQ(socwl2_irq) enable
+//! IRQ2 REG 41H
+#define XPOWERS_AXP2101_PKEY_POSITIVE_IRQ        _BV(8)   //!< POWERON Positive Edge IRQ(ponpe_irq_en) enable
+#define XPOWERS_AXP2101_PKEY_NEGATIVE_IRQ        _BV(9)   //!< POWERON Negative Edge IRQ(ponne_irq_en) enable
+#define XPOWERS_AXP2101_PKEY_LONG_IRQ            _BV(10)  //!< POWERON Long PRESS IRQ(ponlp_irq) enable
+#define XPOWERS_AXP2101_PKEY_SHORT_IRQ           _BV(11)  //!< POWERON Short PRESS IRQ(ponsp_irq_en) enable
+#define XPOWERS_AXP2101_BAT_REMOVE_IRQ           _BV(12)  //!< Battery Remove IRQ(bremove_irq) enable
+#define XPOWERS_AXP2101_BAT_INSERT_IRQ           _BV(13)  //!< Battery Insert IRQ(binsert_irq) enabl
+#define XPOWERS_AXP2101_VBUS_REMOVE_IRQ          _BV(14)  //!< VBUS Remove IRQ(vremove_irq) enabl
+#define XPOWERS_AXP2101_VBUS_INSERT_IRQ          _BV(15)  //!< VBUS Insert IRQ(vinsert_irq) enable
+//! IRQ3 REG 42H
+#define XPOWERS_AXP2101_BAT_OVER_VOL_IRQ         _BV(16)  //!< Battery Over Voltage Protection IRQ(bovp_irq) enable
+#define XPOWERS_AXP2101_CHAGER_TIMER_IRQ         _BV(17)  //!< Charger Safety Timer1/2 expire IRQ(chgte_irq) enable
+#define XPOWERS_AXP2101_DIE_OVER_TEMP_IRQ        _BV(18)  //!< DIE Over Temperature level1 IRQ(dotl1_irq) enable
+#define XPOWERS_AXP2101_BAT_CHG_START_IRQ        _BV(19)  //!< Charger start IRQ(chgst_irq) enable
+#define XPOWERS_AXP2101_BAT_CHG_DONE_IRQ         _BV(20)  //!< Battery charge done IRQ(chgdn_irq) enable
+#define XPOWERS_AXP2101_BATFET_OVER_CURR_IRQ     _BV(21)  //!< BATFET Over Current Protection IRQ(bocp_irq) enable
+#define XPOWERS_AXP2101_LDO_OVER_CURR_IRQ        _BV(22)  //!< LDO Over Current IRQ(ldooc_irq) enable
+#define XPOWERS_AXP2101_WDT_EXPIRE_IRQ           _BV(23)  //!< Watchdog Expire IRQ(wdexp_irq) enable
 
-    //! IRQ2 REG 41H
-    XPOWERS_AXP2101_PKEY_POSITIVE_IRQ        = _BV(8),   // POWERON Positive Edge IRQ(ponpe_irq_en) enable
-    XPOWERS_AXP2101_PKEY_NEGATIVE_IRQ        = _BV(9),   // POWERON Negative Edge IRQ(ponne_irq_en) enable
-    XPOWERS_AXP2101_PKEY_LONG_IRQ            = _BV(10),  // POWERON Long PRESS IRQ(ponlp_irq) enable
-    XPOWERS_AXP2101_PKEY_SHORT_IRQ           = _BV(11),  // POWERON Short PRESS IRQ(ponsp_irq_en) enable
-    XPOWERS_AXP2101_BAT_REMOVE_IRQ           = _BV(12),  // Battery Remove IRQ(bremove_irq) enable
-    XPOWERS_AXP2101_BAT_INSERT_IRQ           = _BV(13),  // Battery Insert IRQ(binsert_irq) enabl
-    XPOWERS_AXP2101_VBUS_REMOVE_IRQ          = _BV(14),  // VBUS Remove IRQ(vremove_irq) enabl
-    XPOWERS_AXP2101_VBUS_INSERT_IRQ          = _BV(15),  // VBUS Insert IRQ(vinsert_irq) enable
+#define XPOWERS_AXP2101_ALL_IRQ                  (0xFFFFFFFFUL)
 
-    //! IRQ3 REG 42H
-    XPOWERS_AXP2101_BAT_OVER_VOL_IRQ         = _BV(16),  // Battery Over Voltage Protection IRQ(bovp_irq) enable
-    XPOWERS_AXP2101_CHAGER_TIMER_IRQ         = _BV(17),  // Charger Safety Timer1/2 expire IRQ(chgte_irq) enable
-    XPOWERS_AXP2101_DIE_OVER_TEMP_IRQ        = _BV(18),  // DIE Over Temperature level1 IRQ(dotl1_irq) enable
-    XPOWERS_AXP2101_BAT_CHG_START_IRQ        = _BV(19),  // Charger start IRQ(chgst_irq) enable
-    XPOWERS_AXP2101_BAT_CHG_DONE_IRQ         = _BV(20),  // Battery charge done IRQ(chgdn_irq) enable
-    XPOWERS_AXP2101_BATFET_OVER_CURR_IRQ     = _BV(21),  // BATFET Over Current Protection IRQ(bocp_irq) enable
-    XPOWERS_AXP2101_LDO_OVER_CURR_IRQ        = _BV(22),  // LDO Over Current IRQ(ldooc_irq) enable
-    XPOWERS_AXP2101_WDT_EXPIRE_IRQ           = _BV(23),  // Watchdog Expire IRQ(wdexp_irq) enable
-
-    XPOWERS_AXP2101_ALL_IRQ                  = (0xFFFFFFFFUL)
-} xpowers_axp2101_irq_t;
 
 
 uint32_t AXP2101_shutdown(void);

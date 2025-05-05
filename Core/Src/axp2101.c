@@ -2,6 +2,8 @@
 #include "main.h"
 #include "stm32_assert.h"
 
+#define AXP2101_DEV_I2C_ID	0x68
+
 
 static uint8_t statusRegister[XPOWERS_AXP2101_INTSTS_CNT] = {0};
 static uint8_t intRegister[XPOWERS_AXP2101_INTSTS_CNT] = {0};
@@ -11,19 +13,19 @@ __STATIC_INLINE uint8_t clrRegisterBit(uint8_t registers, uint8_t bit) {
 	uint8_t reg_value = 0;
 	HAL_StatusTypeDef status;
 
-	status = HAL_I2C_Mem_Read(&hi2c2, 0x68, registers, 1, &reg_value, 1, 60);
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, registers, 1, &reg_value, 1, 60);
 	if (status != HAL_OK)
 		return 1;
 
 	reg_value &= (uint8_t)(~_BV(bit));
-	return HAL_I2C_Mem_Write(&hi2c2, 0x68, registers, 1, &reg_value, 1, 60);
+	return HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, registers, 1, &reg_value, 1, 60);
 }
 
 __STATIC_INLINE uint8_t getRegisterBit(uint8_t registers, uint8_t bit) {
 	uint8_t reg_value = 0;
 	HAL_StatusTypeDef status;
 
-	status = HAL_I2C_Mem_Read(&hi2c2, 0x68, registers, 1, &reg_value, 1, 60);
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, registers, 1, &reg_value, 1, 60);
 	if (status != HAL_OK)
 		return 1;
 
@@ -34,12 +36,12 @@ __STATIC_INLINE uint8_t setRegisterBit(uint8_t registers, uint8_t bit) {
 	uint8_t reg_value = 0;
 	HAL_StatusTypeDef status;
 
-	status = HAL_I2C_Mem_Read(&hi2c2, 0x68, registers, 1, &reg_value, 1, 60);
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, registers, 1, &reg_value, 1, 60);
 	if (status != HAL_OK)
 		return 1;
 
 	reg_value |= (uint8_t)(_BV(bit));
-	return HAL_I2C_Mem_Write(&hi2c2, 0x68, registers, 1, &reg_value, 1, 60);
+	return HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, registers, 1, &reg_value, 1, 60);
 }
 
 uint32_t setInterruptImpl(uint32_t opts, uint8_t enable) {
@@ -47,17 +49,17 @@ uint32_t setInterruptImpl(uint32_t opts, uint8_t enable) {
 	HAL_StatusTypeDef status = HAL_OK;
 
 	if (opts & 0x0000FF) {
-		HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_INTEN1, 1, &reg_value, 1, 60);
+		HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_INTEN1, 1, &reg_value, 1, 60);
 		intRegister[0] = enable ? (uint8_t)(reg_value | (opts & 0xFF)) : (uint8_t)(reg_value & (~(opts & 0xFF)));
 		status |= HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_INTEN1, 1, &intRegister[0], 1, 60);
 	}
 	if (opts & 0x00FF00) {
-		HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_INTEN2, 1, &reg_value, 1, 60);
+		HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_INTEN2, 1, &reg_value, 1, 60);
 		intRegister[1] = enable ? (uint8_t)(reg_value | (opts >> 8)) : (uint8_t)(reg_value & (~(opts >> 8)));
 		status |= HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_INTEN2, 1, &intRegister[1], 1, 60);
 	}
 	if (opts & 0xFF0000) {
-		HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_INTEN3, 1, &reg_value, 1, 60);
+		HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_INTEN3, 1, &reg_value, 1, 60);
 		intRegister[2] = enable ? (uint8_t)(reg_value | (opts >> 16)) : (uint8_t)(reg_value & (~(opts >> 16)));
 		status |= HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_INTEN3, 1, &intRegister[2], 1, 60);
 	}
@@ -103,7 +105,7 @@ uint32_t AXP2101_clearIrqStatus(void) {
 	uint8_t fbuff = 0xFF;
 
 	for (size_t i = 0; i < XPOWERS_AXP2101_INTSTS_CNT; i++) {
-		status |= HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_INTSTS1 + (uint8_t)i, 1, &fbuff, 1, 60);
+		status |= HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_INTSTS1 + (uint8_t)i, 1, &fbuff, 1, 60);
 		statusRegister[i] = 0;
 	}
 
@@ -111,7 +113,7 @@ uint32_t AXP2101_clearIrqStatus(void) {
 }
 
 uint8_t AXP2101_isDropWarningLevel1Irq(void) {
-	uint8_t mask = XPOWERS_AXP2101_WARNING_LEVEL1_IRQ >> 8;
+	uint8_t mask = XPOWERS_AXP2101_WARNING_LEVEL1_IRQ;
 	if (intRegister[0] & mask)
 		return ((statusRegister[0] & mask) == mask);
 	return 0;
@@ -153,14 +155,14 @@ uint8_t AXP2101_isPekeyLongPressIrq(void) {
 }
 
 uint8_t AXP2101_isBatChargeDoneIrq(void) {
-	uint8_t mask = XPOWERS_AXP2101_BAT_CHG_DONE_IRQ >> 8;
+	uint8_t mask = XPOWERS_AXP2101_BAT_CHG_DONE_IRQ >> 16;
 	if (intRegister[2] & mask)
 		return ((statusRegister[2] & mask) == mask);
 	return 0;
 }
 
 uint8_t AXP2101_isBatChargeStartIrq(void) {
-	uint8_t mask = XPOWERS_AXP2101_BAT_CHG_START_IRQ >> 8;
+	uint8_t mask = XPOWERS_AXP2101_BAT_CHG_START_IRQ >> 16;
 	if (intRegister[2] & mask)
 		return ((statusRegister[2] & mask) == mask);
 	return 0;
@@ -184,13 +186,13 @@ uint32_t AXP2101_setSysPowerDownVoltage(uint16_t value) {
 		return 10;
 	}
 
-	status = HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_VOFF_SET, 1, &reg_value, 1, 60);
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_VOFF_SET, 1, &reg_value, 1, 60);
 	if (status != HAL_OK)
 		return 1;
 
 	reg_value &= 0xF8;
 	reg_value |= (uint8_t)((value - XPOWERS_AXP2101_VSYS_VOL_THRESHOLD_MIN) / XPOWERS_AXP2101_VSYS_VOL_THRESHOLD_STEPS);
-	return (uint32_t)HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_VOFF_SET, 1, &reg_value, 1, 60);
+	return (uint32_t)HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_VOFF_SET, 1, &reg_value, 1, 60);
 }
 
 uint32_t AXP2101_setChargingLedMode(uint8_t mode) {
@@ -204,7 +206,7 @@ uint32_t AXP2101_setChargingLedMode(uint8_t mode) {
 	case XPOWERS_CHG_LED_BLINK_1HZ:
 	case XPOWERS_CHG_LED_BLINK_4HZ:
 	case XPOWERS_CHG_LED_ON:
-		status = HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
+		status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
 		if (status != HAL_OK)
 			return 1;
 
@@ -212,10 +214,10 @@ uint32_t AXP2101_setChargingLedMode(uint8_t mode) {
 		reg_value |= 0x05;    //use manual ctrl
 		reg_value |= (mode << 4);
 
-		status = HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
+		status = HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
 		break;
 	case XPOWERS_CHG_LED_CTRL_CHG:
-		status = HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
+		status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
 		if (status != HAL_OK)
 			return 1;
 
@@ -223,7 +225,7 @@ uint32_t AXP2101_setChargingLedMode(uint8_t mode) {
 		reg_value |= 0x01;	// use type A mode
 		//reg_value |= 0x02;	// use type B mode
 
-		status = HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
+		status = HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_CHGLED_SET_CTRL, 1, &reg_value, 1, 60);
 		break;
 	default:
 		status = 10;
@@ -245,13 +247,13 @@ uint32_t AXP2101_setLowBatWarnThreshold(uint8_t percentage) {
 	uint8_t reg_value = 0;
 	HAL_StatusTypeDef status;
 
-	status = HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
 	if (status != HAL_OK)
 		return 1;
 
 	reg_value &= 0x0F;
 	reg_value |= (uint8_t)((percentage - 5) << 4);
-	return HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
+	return HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
 }
 
 /**
@@ -266,13 +268,13 @@ uint32_t AXP2101_setLowBatShutdownThreshold(uint8_t opt) {
 	if (opt > 15)
 		opt = 15;
 
-	status = HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
 	if (status != HAL_OK)
 		return 1;
 
 	reg_value &= 0xF0;
 	reg_value |= opt;
-	return HAL_I2C_Mem_Write(&hi2c2, 0x68, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
+	return HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_LOW_BAT_WARN_SET, 1, &reg_value, 1, 60);
 }
 
 
@@ -283,7 +285,7 @@ uint8_t AXP2101_isBatteryConnect(void) {
 uint8_t AXP2101_isCharging(void) {
 	uint8_t reg_value = 0;
 
-	HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_STATUS2, 1, &reg_value, 1, 60);
+	HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_STATUS2, 1, &reg_value, 1, 60);
 
 	return (reg_value >> 5) == 0x01;
 }
@@ -291,9 +293,9 @@ uint8_t AXP2101_isCharging(void) {
 uint32_t AXP2101_getIrqStatus(uint32_t* out_value) {
 	HAL_StatusTypeDef status = HAL_OK;
 
-	status |= HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_INTSTS1, 1, &statusRegister[0], 1, 60);
-	status |= HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_INTSTS2, 1, &statusRegister[1], 1, 60);
-	status |= HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_INTSTS3, 1, &statusRegister[2], 1, 60);
+	status |= HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_INTSTS1, 1, &statusRegister[0], 1, 60);
+	status |= HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_INTSTS2, 1, &statusRegister[1], 1, 60);
+	status |= HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_INTSTS3, 1, &statusRegister[2], 1, 60);
 
 	((uint8_t*)&out_value)[0] = statusRegister[0];
 	((uint8_t*)&out_value)[0] = statusRegister[1];
@@ -307,5 +309,5 @@ uint32_t AXP2101_getBatteryPercent(uint8_t* out_value) {
 	if (!AXP2101_isBatteryConnect())
 		return 1;
 
-	return HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_BAT_PERCENT_DATA, 1, out_value, 1, 60);
+	return HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_BAT_PERCENT_DATA, 1, out_value, 1, 60);
 }
