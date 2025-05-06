@@ -9,6 +9,13 @@
 //includes
 #include "stm32f1xx_hal.h"
 
+//---------------------------------------------Datas registration--------------------------------------------
+
+#define EEPROM_VAR_ID	(0)		// 16b: Init ID: 0xCA1C
+#define EEPROM_VAR_CFG	(1)		// 16b: 0x00 + CFG reg
+#define EEPROM_VAR_KBD	(2)		// 16b: DEB + FRQ regs
+#define EEPROM_VAR_BCKL	(3)		// 16b: LCD + KBD backlight step indice
+
 //-------------------------------------------library configuration-------------------------------------------
 
 //number of variables (maximum variable name is EEPROM_VARIABLE_COUNT - 1)

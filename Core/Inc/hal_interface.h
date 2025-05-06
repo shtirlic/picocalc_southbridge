@@ -1,26 +1,22 @@
-/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
+  * @file         hal_interface.h
+  * @brief        Central access to STM32-HAL definitions and
+  *               related functions.
+  ******************************************************************************
+  * @attention
   *
   * Copyright (c) 2025 C.ARE (JackCarterSmith).
+  * Copyright (c) 2025 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
   * in the root directory of this software component.
   *
   ******************************************************************************
+  *
   */
-/* USER CODE END Header */
 
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __MAIN_H
-#define __MAIN_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_ll_iwdg.h"
 #include "stm32f1xx_ll_rcc.h"
@@ -33,46 +29,17 @@ extern "C" {
 #include "stm32f1xx_ll_dma.h"
 #include "stm32f1xx_ll_rtc.h"
 #include "stm32f1xx_ll_gpio.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
 #include "stm32f1xx_ll_tim.h"
-/* USER CODE END Includes */
 
-/* Exported types ------------------------------------------------------------*/
-/* USER CODE BEGIN ET */
 
-/* USER CODE END ET */
+#ifndef HAL_INTERFACE_H_
+#define HAL_INTERFACE_H_
 
-/* Exported constants --------------------------------------------------------*/
-/* USER CODE BEGIN EC */
-extern TIM_HandleTypeDef htim1;
-extern TIM_HandleTypeDef htim3;
-extern I2C_HandleTypeDef hi2c2;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-extern volatile uint32_t systicks_counter;
-extern volatile uint8_t pmu_irq;
-extern uint8_t io_matrix[9];
-extern uint8_t js_bits;
-/* USER CODE END EC */
-
-/* Exported macro ------------------------------------------------------------*/
-/* USER CODE BEGIN EM */
-
-/* USER CODE END EM */
-
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-
-/* Exported functions prototypes ---------------------------------------------*/
-void Error_Handler(void);
-
-/* USER CODE BEGIN EFP */
-__STATIC_INLINE uint32_t uptime_ms(void) { return systicks_counter; }
-
-void flash_one_time(uint32_t ts, uint8_t restore_status);
-/* USER CODE END EFP */
-
-/* Private defines -----------------------------------------------------------*/
+// HAL GPIO pins definition --------------------------------------------------------
 #define SYS_LED_Pin LL_GPIO_PIN_13
 #define SYS_LED_GPIO_Port GPIOC
 #define COL_1_Pin LL_GPIO_PIN_0
@@ -157,15 +124,38 @@ void flash_one_time(uint32_t ts, uint8_t restore_status);
 #define PICO_SDA_Pin LL_GPIO_PIN_9
 #define PICO_SDA_GPIO_Port GPIOB
 
-/* USER CODE BEGIN Private defines */
-#define EEPROM_VAR_ID	(0)		// 16b: Init ID: 0xCA1C
-#define EEPROM_VAR_CFG	(1)		// 16b: 0x00 + CFG reg
-#define EEPROM_VAR_KBD	(2)		// 16b: DEB + FRQ regs
-#define EEPROM_VAR_BCKL	(3)		// 16b: LCD + KBD backlight step indice
-/* USER CODE END Private defines */
+
+// Global variables definition --------------------------------------------------------
+extern volatile uint32_t systicks_counter;
+extern volatile uint8_t pmu_irq;
+
+
+// Global functions definition --------------------------------------------------------
+HAL_StatusTypeDef HAL_Interface_init(void);
+
+__STATIC_INLINE uint32_t uptime_ms(void) { return systicks_counter; }
+void flash_one_time(uint32_t ts, uint8_t restore_status);
+
+void Error_Handler(void);
+
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  The assert_param macro is used for function's parameters check.
+  * @param  expr If expr is false, it calls assert_failed function
+  *         which reports the name of the source file and the source
+  *         line number of the call that failed.
+  *         If expr is true, it returns no value.
+  * @retval None
+  */
+#define assert_param(expr) ((expr) ? (void)0U : assert_failed((uint8_t *)__FILE__, __LINE__))
+/* Exported functions ------------------------------------------------------- */
+void assert_failed(uint8_t *file, uint32_t line);
+#else
+#define assert_param(expr) ((void)0U)
+#endif /* USE_FULL_ASSERT */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __MAIN_H */
+#endif /* HAL_INTERFACE_H_ */

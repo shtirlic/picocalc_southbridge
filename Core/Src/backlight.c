@@ -1,7 +1,11 @@
 #include "backlight.h"
-#include "main.h"
+
+#include "hal_interface.h"
 #include "regs.h"
 
+
+extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim3;
 
 // LCD backlight curve based on brightness measurements for specific value of PWM duty cycle.
 // Using this, I've established a custom command curve.

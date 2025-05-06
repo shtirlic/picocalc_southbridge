@@ -1,7 +1,8 @@
 #include "regs.h"
-#include "main.h"
+
+#include "hal_interface.h"
 #include "eeprom.h"
-#include "backlight.h"
+#include "version.h"
 
 
 static uint8_t regs[REG_ID_LAST] = {0};
@@ -59,6 +60,8 @@ inline void reg_set_bit(enum reg_id reg, uint8_t bit) {
 void reg_init(void) {
 	uint16_t buff;
 
+	regs[REG_ID_VER] = (uint8_t)((VERSION_MAJOR << 4) | VERSION_MINOR);	// 1.2 => (0x1 << 4) | 0x2
+
 	EEPROM_ReadVariable(EEPROM_VAR_CFG, (EEPROM_Value*)&buff);
 	regs[REG_ID_CFG] = (uint8_t)(buff & 0xFF);
 
@@ -71,6 +74,8 @@ void reg_init(void) {
 	regs[REG_ID_BK2] = (uint8_t)(buff & 0xFF);
 
 	regs[REG_ID_BAT] = 0; //default .no battery ,no charging
+
+	regs[REG_ID_TYP] = 0xCA;	// That's me :3
 
 	eeprom_refresh_counter = uptime_ms();
 }

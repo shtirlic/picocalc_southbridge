@@ -1,4 +1,6 @@
 #include "keyboard.h"
+
+#include "hal_interface.h"
 #include "regs.h"
 #include "backlight.h"
 #include "batt.h"
@@ -107,6 +109,9 @@ static uint8_t capslock_changed = 0;
 static uint8_t capslock = 0;
 static uint8_t numlock_changed = 0;
 static uint8_t numlock = 0;
+
+uint8_t io_matrix[9] = {0};		//for IO matrix,last byte is the restore key(c64 only)
+uint8_t js_bits = 0xFF;			// c64 joystick bits
 
 
 inline void keyboard_set_key_callback(key_callback callback) {

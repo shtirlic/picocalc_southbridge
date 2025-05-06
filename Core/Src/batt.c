@@ -1,5 +1,6 @@
 #include "batt.h"
-#include "main.h"
+
+#include "hal_interface.h"
 #include "axp2101.h"
 
 

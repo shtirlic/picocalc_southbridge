@@ -19,6 +19,7 @@ enum reg_id
 	REG_ID_BAT = 0x0B, // battery
 	REG_ID_C64_MTX = 0x0C,// read c64 matrix
 	REG_ID_C64_JS = 0x0D, // joystick io bits
+	REG_ID_TYP = 0xFF, // firmware type (0=official, others=custom)
 	REG_ID_LAST,
 };
 

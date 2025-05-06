@@ -1,9 +1,12 @@
 #include "axp2101.h"
-#include "main.h"
-#include "stm32_assert.h"
+
+#include "hal_interface.h"
+
 
 #define AXP2101_DEV_I2C_ID	0x68
 
+
+extern I2C_HandleTypeDef hi2c2;
 
 static uint8_t statusRegister[XPOWERS_AXP2101_INTSTS_CNT] = {0};
 static uint8_t intRegister[XPOWERS_AXP2101_INTSTS_CNT] = {0};

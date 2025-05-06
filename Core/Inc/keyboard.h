@@ -1,5 +1,4 @@
 #include "stm32f1xx_hal.h"
-#include "main.h"
 
 #ifndef KEYBOARD_H_
 #define KEYBOARD_H_
@@ -74,9 +73,11 @@ enum key_state {
 #define KEY_F10 0x90
 
 
+extern uint8_t io_matrix[9];
+extern uint8_t js_bits;
+
 typedef void (*key_callback)(char, enum key_state);
 typedef void (*lock_callback)(uint8_t, uint8_t);
-
 
 void keyboard_set_key_callback(key_callback callback);
 void keyboard_set_lock_callback(lock_callback callback);

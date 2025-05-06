@@ -59,8 +59,12 @@ void EXTI9_5_IRQHandler(void);
 void TIM2_IRQHandler(void);
 void I2C1_EV_IRQHandler(void);
 void I2C1_ER_IRQHandler(void);
+#ifdef DEBUG
 void USART1_IRQHandler(void);
+#endif
+#ifdef UART_PICO_INTERFACE
 void USART3_IRQHandler(void);
+#endif
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
