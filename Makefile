@@ -35,7 +35,7 @@ BUILD_DIR = build
 C_SOURCES =  \
 Core/Src/main.c \
 Core/Src/stm32f1xx_it.c \
-Core/Src/stm32f1xx_hal_msp.c \
+Core/Src/hal_interface.c \
 Core/Src/axp2101.c \
 Core/Src/backlight.c \
 Core/Src/batt.c \

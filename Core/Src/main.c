@@ -76,7 +76,8 @@ static volatile uint8_t i2cs_w_len = 0;
 static enum i2cs_state i2cs_state = I2CS_STATE_IDLE;
 
 static uint8_t keycb_start = 0;
-static uint32_t head_phone_status = 0;
+static uint32_t head_phone_status = 0;	// TODO: Combine status registers
+
 volatile uint8_t pmu_irq = 0;
 static uint32_t pmu_online = 0;
 
@@ -135,10 +136,10 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					i2cs_w_buff[1] = item.key;
 				} else if (reg == REG_ID_VER) {
 					i2cs_w_buff[1] = reg_get_value(REG_ID_VER);
-				} else if (reg == REG_ID_BAT) {
-					i2cs_w_buff[1] = reg_get_value(REG_ID_BAT);
 				} else if (reg == REG_ID_TYP) {
 					i2cs_w_buff[1] = reg_get_value(REG_ID_TYP);
+				} else if (reg == REG_ID_BAT) {
+					i2cs_w_buff[1] = reg_get_value(REG_ID_BAT);
 				} else if (reg == REG_ID_KEY) {
 					i2cs_w_buff[0] = fifo_count();
 					i2cs_w_buff[0] |= keyboard_get_numlock() ? KEY_NUMLOCK : 0x00;
@@ -151,6 +152,16 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					i2cs_w_len = 10;
 				} else if (reg == REG_ID_C64_JS) {
 					i2cs_w_buff[1] = js_bits;
+				} else if (reg == REG_ID_RST_PICO) {
+					if (is_write)
+						reg_set_value(REG_ID_RST_PICO, 1);
+					i2cs_w_buff[1] = reg_get_value(REG_ID_RST_PICO);
+				} else if (reg == REG_ID_SHTDW) {
+					if (is_write) {
+						reg_set_value(REG_ID_SHTDW, 1);
+						return;		// Ignore answer, everything will be shutdown
+					}
+					i2cs_w_buff[1] = 0;
 				} else {
 					i2cs_w_buff[0] = 0;
 					i2cs_w_buff[1] = 0;
@@ -364,6 +375,29 @@ int main(void) {
 		check_pmu_int();
 		keyboard_process();
 		hw_check_HP_presence();
+
+		// Check internal status
+		if (reg_get_value(REG_ID_SHTDW) == 1) {
+			reg_set_value(REG_ID_SHTDW, 0);
+			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+			AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+
+			AXP2101_shutdown();
+		} else if (reg_get_value(REG_ID_RST_PICO) == 1) {
+			reg_set_value(REG_ID_RST_PICO, 0);
+			HAL_Delay(200);		// Wait for final I2C answer
+			if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
+				Error_Handler();
+			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+
+			HAL_Delay(200);		// No need to use keyboard, so a simple delay should suffice
+			LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+			LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+			if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+				Error_Handler();
+		}
 	}
 }
 
