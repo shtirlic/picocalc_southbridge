@@ -67,7 +67,7 @@ void reg_init(void) {
 	regs[REG_ID_INT_CFG] = (uint8_t)(buff & 0xFF);
 
 	EEPROM_ReadVariable(EEPROM_VAR_KBD, (EEPROM_Value*)&buff);
-	regs[REG_ID_DEB] = (uint8_t)((buff >> 8) & 0xFF);
+	//regs[REG_ID_DEB] = (uint8_t)((buff >> 8) & 0xFF);
 	regs[REG_ID_FRQ] = (uint8_t)(buff & 0xFF);
 
 	EEPROM_ReadVariable(EEPROM_VAR_BCKL, (EEPROM_Value*)&buff);
@@ -96,7 +96,7 @@ uint32_t reg_check_and_save_eeprom(void) {
 			result |= EEPROM_WriteVariable(EEPROM_VAR_CFG, (EEPROM_Value)(uint16_t)((regs[REG_ID_CFG] << 8) | regs[REG_ID_INT_CFG]), EEPROM_SIZE16);
 
 		if (regs_unsync[REG_ID_DEB] == 1 || regs_unsync[REG_ID_FRQ] == 1)
-			result |= EEPROM_WriteVariable(EEPROM_VAR_KBD, (EEPROM_Value)(uint16_t)((regs[REG_ID_DEB] << 8) | regs[REG_ID_FRQ]), EEPROM_SIZE16);
+			result |= EEPROM_WriteVariable(EEPROM_VAR_KBD, (EEPROM_Value)(uint32_t)((keyboard_get_hold_period() << 16) | regs[REG_ID_FRQ]), EEPROM_SIZE32);
 
 		if (regs_unsync[REG_ID_BKL] == 1 || regs_unsync[REG_ID_BK2] == 1)
 			result |= EEPROM_WriteVariable(EEPROM_VAR_BCKL, (EEPROM_Value)(uint16_t)((regs[REG_ID_BKL] << 8) | regs[REG_ID_BK2]), EEPROM_SIZE16);

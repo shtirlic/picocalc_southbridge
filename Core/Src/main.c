@@ -26,8 +26,10 @@
 // Private define ------------------------------------------------------------
 //#define DEFAULT_LCD_BL	(205)	// ~40% PWM@7.81kHz (9 bits resolution)
 //#define DEFAULT_KBD_BL	(20)	// ~4% PWM@7.81kHz (9 bits resolution)
-#define DEFAULT_LCD_BL	(3)		//step-4 (~50%)
-#define DEFAULT_KBD_BL	(0)		//step-1 (0%)
+#define DEFAULT_LCD_BL		(3)		//step-4 (~50%)
+#define DEFAULT_KBD_BL		(0)		//step-1 (0%)
+#define DEFAULT_KBD_FREQ	(KEY_POLL_TIME)
+#define DEFAULT_KBD_DEB		(KEY_HOLD_TIME)
 
 #define I2CS_REARM_TIMEOUT	500
 #define I2CS_W_BUFF_LEN		31+1	// The last one must be only a 0 value, TODO: another cleaner way?
@@ -68,7 +70,7 @@ volatile uint32_t systicks_counter = 0;		// 1 MHz systick counter - TODO: implem
 volatile uint32_t pmu_check_counter = 0;
 volatile uint32_t i2cs_rearm_counter = 0;
 
-static uint8_t i2cs_r_buff[2];
+static uint8_t i2cs_r_buff[5];
 static volatile uint8_t i2cs_r_idx = 0;
 static uint8_t i2cs_w_buff[I2CS_W_BUFF_LEN];
 static volatile uint8_t i2cs_w_idx = 0;
@@ -129,6 +131,25 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					if (is_write)
 						kbd_backlight_update(i2cs_r_buff[1]);
 					i2cs_w_buff[1] = reg_get_value(REG_ID_BK2);
+				} else if (reg == REG_ID_CFG) {
+					if (is_write)
+						reg_set_value(REG_ID_CFG, i2cs_r_buff[1]);
+					i2cs_w_buff[1] = reg_get_value(REG_ID_CFG);
+				} else if (reg == REG_ID_INT_CFG) {
+					if (is_write)
+						reg_set_value(REG_ID_INT_CFG, i2cs_r_buff[1]);
+					i2cs_w_buff[1] = reg_get_value(REG_ID_INT_CFG);
+				} else if (reg == REG_ID_DEB) {
+					if (is_write) {
+						keyboard_set_hold_period(*((uint16_t*)&i2cs_r_buff[1]));
+						reg_set_value(REG_ID_DEB, 0);	// Trig async flag for EEPROM saving
+					}
+					*((uint16_t*)&i2cs_w_buff[1]) = keyboard_get_hold_period();
+					i2cs_w_len = 3;
+				} else if (reg == REG_ID_FRQ) {
+					if (is_write)
+						reg_set_value(REG_ID_FRQ, i2cs_r_buff[1]);
+					i2cs_w_buff[1] = reg_get_value(REG_ID_FRQ);
 				} else if (reg == REG_ID_FIF) {
 					struct fifo_item item = {0};
 					fifo_dequeue(&item);
@@ -188,14 +209,24 @@ extern void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 		if (i2cs_state == I2CS_STATE_REG_REQUEST) {
 			const uint8_t is_write = (uint8_t)(i2cs_r_buff[0] & (1 << 7));
 			const uint8_t reg = (uint8_t)(i2cs_r_buff[0] & ~(1 << 7));
+			uint8_t bytes_needed = 0;
 
-			// We wait an another byte for these registers
+			// Check for another mandatories bytes depending on register requested
 			if (reg == REG_ID_BKL ||
-				reg == REG_ID_BK2) {
-				if (is_write) {
-					HAL_I2C_Slave_Sequential_Receive_IT(hi2c, i2cs_r_buff + i2cs_r_idx, 1, I2C_NEXT_FRAME);	// This write the second received byte to i2cs_r_buff[1]
-				}
+				reg == REG_ID_BK2 ||
+				reg == REG_ID_CFG ||
+				reg == REG_ID_INT_CFG ||
+				reg == REG_ID_FRQ) {
+				if (is_write)
+					bytes_needed = 1;
+
+			} else if (reg == REG_ID_DEB) {
+				if (is_write)
+					bytes_needed = 2;
 			}
+
+			if (bytes_needed > 0)
+				HAL_I2C_Slave_Sequential_Receive_IT(hi2c, i2cs_r_buff + i2cs_r_idx, bytes_needed, I2C_NEXT_FRAME);	// This write the second or more received byte to i2cs_r_buff[1]
 		}
 	}
 }
@@ -261,7 +292,7 @@ int main(void) {
 	EEPROM_ReadVariable(EEPROM_VAR_ID, (EEPROM_Value*)&result);
 	if ((uint16_t)result != 0xCA1C) {
 		EEPROM_WriteVariable(EEPROM_VAR_BCKL, (EEPROM_Value)(uint16_t)((DEFAULT_LCD_BL << 8) | DEFAULT_KBD_BL), EEPROM_SIZE16);
-		EEPROM_WriteVariable(EEPROM_VAR_KBD, (EEPROM_Value)(uint16_t)((10 << 8) | 5), EEPROM_SIZE16);
+		EEPROM_WriteVariable(EEPROM_VAR_KBD, (EEPROM_Value)(uint32_t)((DEFAULT_KBD_DEB << 16) | DEFAULT_KBD_FREQ), EEPROM_SIZE32);
 		EEPROM_WriteVariable(EEPROM_VAR_CFG, (EEPROM_Value)(uint16_t)(((CFG_USE_MODS | CFG_REPORT_MODS) << 8) | (INT_OVERFLOW | INT_KEY)), EEPROM_SIZE16);
 		EEPROM_WriteVariable(EEPROM_VAR_ID, (EEPROM_Value)(uint16_t)0xCA1C, EEPROM_SIZE16);
 #ifdef DEBUG

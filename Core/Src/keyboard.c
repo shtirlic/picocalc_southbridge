@@ -109,6 +109,7 @@ static uint8_t capslock_changed = 0;
 static uint8_t capslock = 0;
 static uint8_t numlock_changed = 0;
 static uint8_t numlock = 0;
+static uint16_t hold_period = KEY_HOLD_TIME;
 
 uint8_t io_matrix[9] = {0};		//for IO matrix,last byte is the restore key(c64 only)
 uint8_t js_bits = 0xFF;			// c64 joystick bits
@@ -128,6 +129,14 @@ inline uint8_t keyboard_get_capslock(void) {
 
 inline uint8_t keyboard_get_numlock(void) {
 	return numlock & 0x1;
+}
+
+inline uint16_t keyboard_get_hold_period(void) {
+	return hold_period;
+}
+
+inline void keyboard_set_hold_period(uint16_t value) {
+	hold_period = value;
 }
 
 static void transition_to(struct list_item * const p_item, const enum key_state next_state) {
@@ -272,7 +281,7 @@ static void next_item_state(struct list_item* const p_item, const uint8_t presse
 		break;
 
 	case KEY_STATE_PRESSED:
-		if (uptime_ms() > p_item->hold_start_time + KEY_HOLD_TIME) {
+		if (uptime_ms() > p_item->hold_start_time + hold_period) {
 			transition_to(p_item, KEY_STATE_HOLD);
 			p_item->last_repeat_time = uptime_ms();
 		} else if (!pressed)
@@ -283,7 +292,7 @@ static void next_item_state(struct list_item* const p_item, const uint8_t presse
 		if (!pressed)
 			transition_to(p_item, KEY_STATE_RELEASED);
 		else {
-			if (uptime_ms() > p_item->hold_start_time + KEY_HOLD_TIME) {
+			if (uptime_ms() > p_item->hold_start_time + hold_period) {
 				if(uptime_ms() > p_item->last_repeat_time + KEY_REPEAT_TIME) {
 					transition_to(p_item, KEY_STATE_HOLD);
 					p_item->last_repeat_time = uptime_ms();
@@ -305,7 +314,7 @@ static void next_item_state(struct list_item* const p_item, const uint8_t presse
 void keyboard_process(void) {
 	js_bits = 0xFF;
 
-	if (uptime_ms() <= (last_process_time + KEY_POLL_TIME))
+	if (uptime_ms() <= (last_process_time + reg_get_value(REG_ID_FRQ)))
 		return;
 
 	// Scan for columns

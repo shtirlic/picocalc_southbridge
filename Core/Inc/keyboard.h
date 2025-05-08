@@ -83,6 +83,8 @@ void keyboard_set_key_callback(key_callback callback);
 void keyboard_set_lock_callback(lock_callback callback);
 uint8_t keyboard_get_capslock(void);
 uint8_t keyboard_get_numlock(void);
+uint16_t keyboard_get_hold_period(void);
+void keyboard_set_hold_period(uint16_t);
 void keyboard_process(void);
 
 

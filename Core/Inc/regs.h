@@ -29,8 +29,8 @@ enum reg_id {
 	REG_ID_INT = 0x04,			//!< interrupt status
 	REG_ID_BKL = 0x05,			//!< backlight steps (0-9)
 	REG_ID_BK2 = 0x06,			//!< keyboard backlight (0-9)
-	REG_ID_DEB = 0x07,			//!< debounce cfg
-	REG_ID_FRQ = 0x08,			//!< poll freq cfg
+	REG_ID_DEB = 0x07,			//!< debounce cfg (time in ms)
+	REG_ID_FRQ = 0x08,			//!< poll freq cfg (time in ms)
 
 	REG_ID_KEY = 0x10,			//!< key status
 	REG_ID_FIF = 0x11,			//!< fifo

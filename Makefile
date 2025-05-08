@@ -20,6 +20,8 @@ TARGET = picocalc_BIOS_jcs
 DEBUG = 0
 # optimization
 OPT = -O3
+# use old I2C registers structure
+I2C_REGS_COMPAT = 0
 
 
 #######################################
@@ -120,6 +122,10 @@ C_DEFS =  \
 
 ifeq ($(DEBUG), 1)
 C_DEFS += -DDEBUG
+endif
+
+ifeq ($(I2C_REGS_COMPAT), 1)
+C_DEFS += -DI2C_REGS_COMPAT
 endif
 
 
