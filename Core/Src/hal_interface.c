@@ -367,6 +367,14 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_OPENDRAIN;
 	LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+#ifndef UART_PICO_INTERFACE
+	GPIO_InitStruct.Pin = PICO_IRQ_Pin;
+	GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
+	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+	LL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+#endif
+
 	/**/
 	GPIO_InitStruct.Pin = ROW_1_Pin|ROW_2_Pin|ROW_3_Pin|ROW_4_Pin
 						  |ROW_5_Pin|ROW_6_Pin|ROW_7_Pin|ROW_8_Pin;

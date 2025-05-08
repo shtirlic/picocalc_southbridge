@@ -103,10 +103,15 @@ extern "C" {
 #define PICO_EN_GPIO_Port GPIOA
 #define SP_AMP_EN_Pin LL_GPIO_PIN_14
 #define SP_AMP_EN_GPIO_Port GPIOA
+#ifdef UART_PICO_INTERFACE
 #define PICO_UART_TX_Pin LL_GPIO_PIN_10
 #define PICO_UART_TX_GPIO_Port GPIOC
 #define PICO_UART_RX_Pin LL_GPIO_PIN_11
 #define PICO_UART_RX_GPIO_Port GPIOC
+#else
+#define PICO_IRQ_Pin LL_GPIO_PIN_10
+#define PICO_IRQ_GPIO_Port GPIOC
+#endif
 #define HP_DET_Pin LL_GPIO_PIN_12
 #define HP_DET_GPIO_Port GPIOC
 #define KEY_4_Pin LL_GPIO_PIN_3
