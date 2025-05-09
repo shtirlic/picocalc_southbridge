@@ -103,7 +103,7 @@ static const struct gpio_pin btn_pins[12] = {
 static struct list_item keys_list[KEY_LIST_SIZE];
 static lock_callback _lock_callback = NULL;
 static key_callback _key_callback= NULL;
-static uint32_t last_process_time;
+static uint32_t last_process_time = 0;
 static uint8_t mods[MOD_LAST];
 static uint8_t capslock_changed = 0;
 static uint8_t capslock = 0;
@@ -281,7 +281,7 @@ static void next_item_state(struct list_item* const p_item, const uint8_t presse
 		break;
 
 	case KEY_STATE_PRESSED:
-		if (uptime_ms() > p_item->hold_start_time + hold_period) {
+		if (uptime_ms() - p_item->hold_start_time > hold_period) {
 			transition_to(p_item, KEY_STATE_HOLD);
 			p_item->last_repeat_time = uptime_ms();
 		} else if (!pressed)
@@ -292,8 +292,8 @@ static void next_item_state(struct list_item* const p_item, const uint8_t presse
 		if (!pressed)
 			transition_to(p_item, KEY_STATE_RELEASED);
 		else {
-			if (uptime_ms() > p_item->hold_start_time + hold_period) {
-				if(uptime_ms() > p_item->last_repeat_time + KEY_REPEAT_TIME) {
+			if (uptime_ms() - p_item->hold_start_time > hold_period) {
+				if(uptime_ms() - p_item->last_repeat_time > KEY_REPEAT_TIME) {
 					transition_to(p_item, KEY_STATE_HOLD);
 					p_item->last_repeat_time = uptime_ms();
 				}
@@ -314,7 +314,7 @@ static void next_item_state(struct list_item* const p_item, const uint8_t presse
 void keyboard_process(void) {
 	js_bits = 0xFF;
 
-	if (uptime_ms() <= (last_process_time + reg_get_value(REG_ID_FRQ)))
+	if (uptime_ms() - last_process_time <= reg_get_value(REG_ID_FRQ))
 		return;
 
 	// Scan for columns
@@ -417,6 +417,7 @@ void keyboard_process(void) {
 		}
 
 		io_matrix[8] = 0xFF;
-		last_process_time = uptime_ms();
 	}
+
+	last_process_time = uptime_ms();
 }

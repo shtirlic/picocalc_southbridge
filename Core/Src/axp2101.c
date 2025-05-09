@@ -12,6 +12,36 @@ static uint8_t statusRegister[XPOWERS_AXP2101_INTSTS_CNT] = {0};
 static uint8_t intRegister[XPOWERS_AXP2101_INTSTS_CNT] = {0};
 
 
+__STATIC_INLINE int8_t readRegister(uint8_t reg, uint8_t *buf, uint8_t length) {
+	HAL_StatusTypeDef status;
+
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, reg, length, buf, 1, 60);
+	if (status != HAL_OK)
+		return -1;
+
+	return 0;
+}
+
+__STATIC_INLINE uint16_t readRegisterH6L8(uint8_t highReg, uint8_t lowReg) {
+	uint8_t h6;
+	uint8_t l8;
+	int8_t h6_s = readRegister(highReg, &h6, 1);
+	int8_t l8_s = readRegister(lowReg, &l8, 1);
+	if (h6_s == -1 || l8_s == -1)
+		return 0;
+	return ((h6 & 0x3F) << 8) | l8;
+}
+
+__STATIC_INLINE uint16_t readRegisterH5L8(uint8_t highReg, uint8_t lowReg) {
+	uint8_t h5;
+	uint8_t l8;
+	int8_t h5_s = readRegister(highReg, &h5, 1);
+	int8_t l8_s = readRegister(lowReg, &l8, 1);
+	if (h5_s == -1 || l8_s == -1)
+		return 0;
+	return ((h5 & 0x1F) << 8) | l8;
+}
+
 __STATIC_INLINE uint8_t clrRegisterBit(uint8_t registers, uint8_t bit) {
 	uint8_t reg_value = 0;
 	HAL_StatusTypeDef status;
@@ -281,6 +311,12 @@ uint32_t AXP2101_setLowBatShutdownThreshold(uint8_t opt) {
 }
 
 
+int8_t AXP2101_readDataBuffer(uint8_t *data, uint8_t size) {
+	if (size > XPOWERS_AXP2101_DATA_BUFFER_SIZE)
+		return -1;
+	return readRegister(XPOWERS_AXP2101_DATA_BUFFER1, data, size);
+}
+
 uint8_t AXP2101_isBatteryConnect(void) {
     return getRegisterBit(XPOWERS_AXP2101_STATUS1, 3);
 }
@@ -291,6 +327,26 @@ uint8_t AXP2101_isCharging(void) {
 	HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_STATUS2, 1, &reg_value, 1, 60);
 
 	return (reg_value >> 5) == 0x01;
+}
+
+uint8_t AXP2101_isDischarge(void) {
+	uint8_t res = 0;
+	readRegister(XPOWERS_AXP2101_STATUS2, &res, 1);
+	return (res >> 5) == 0x02;
+}
+
+uint8_t AXP2101_isStandby(void) {
+	uint8_t res = 0;
+	readRegister(XPOWERS_AXP2101_STATUS2, &res, 1);
+	return (res >> 5) == 0x00;
+}
+
+uint8_t AXP2101_isVbusGood(void) {
+	return getRegisterBit(XPOWERS_AXP2101_STATUS1, 5);
+}
+
+uint8_t AXP2101_isVbusIn(void) {
+	return getRegisterBit(XPOWERS_AXP2101_STATUS2, 3) == 0 && AXP2101_isVbusGood();
 }
 
 uint32_t AXP2101_getIrqStatus(uint32_t* out_value) {
@@ -313,4 +369,31 @@ uint32_t AXP2101_getBatteryPercent(uint8_t* out_value) {
 		return 1;
 
 	return HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_BAT_PERCENT_DATA, 1, out_value, 1, 60);
+}
+
+xpowers_chg_status_t AXP2101_getChargerStatus(void) {
+	uint8_t val = 0;
+	int8_t status = readRegister(XPOWERS_AXP2101_STATUS2, &val, 1);
+	if (status == -1)
+		return XPOWERS_AXP2101_CHG_STOP_STATE;
+	val &= 0x07;
+	return (xpowers_chg_status_t)val;
+}
+
+uint16_t AXP2101_getBattVoltage(void) {
+	if (!AXP2101_isBatteryConnect()) {
+		return 0;
+	}
+	return readRegisterH5L8(XPOWERS_AXP2101_ADC_DATA_RELUST0, XPOWERS_AXP2101_ADC_DATA_RELUST1);
+}
+
+uint16_t AXP2101_getVbusVoltage(void) {
+	if (!AXP2101_isVbusIn()) {
+		return 0;
+	}
+	return readRegisterH6L8(XPOWERS_AXP2101_ADC_DATA_RELUST4, XPOWERS_AXP2101_ADC_DATA_RELUST5);
+}
+
+uint16_t AXP2101_getSystemVoltage(void) {
+	return readRegisterH6L8(XPOWERS_AXP2101_ADC_DATA_RELUST6, XPOWERS_AXP2101_ADC_DATA_RELUST7);
 }

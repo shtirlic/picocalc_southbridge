@@ -66,9 +66,9 @@ static const uint8_t hexmap[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9
 extern UART_HandleTypeDef huart3;
 #endif
 
-volatile uint32_t systicks_counter = 0;		// 1 MHz systick counter - TODO: implement overflow self-reset mechanism
-volatile uint32_t pmu_check_counter = 0;
-volatile uint32_t i2cs_rearm_counter = 0;
+volatile uint32_t systicks_counter = 0;		// 1 MHz systick counter
+static uint32_t pmu_check_counter = 0;
+static uint32_t i2cs_rearm_counter = 0;
 
 static uint8_t i2cs_r_buff[5];
 static volatile uint8_t i2cs_r_idx = 0;
@@ -89,12 +89,14 @@ static uint32_t pmu_online = 0;
 static void key_cb(char key, enum key_state state);
 static void hw_check_HP_presence(void);
 static void sync_bat(void);
+#ifdef DEBUG
+static void printPMU(void);
+#endif
 static void check_pmu_int(void);
 
 extern void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
 		systicks_counter += 1;
-		i2cs_rearm_counter += 1;
 	}
 }
 
@@ -111,7 +113,7 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 				i2cs_r_idx = 0;
 				HAL_I2C_Slave_Sequential_Receive_IT(hi2c, i2cs_r_buff, 1, I2C_FIRST_FRAME);	// This write the first received byte to i2cs_r_buff[0]
 
-				i2cs_rearm_counter = 0;
+				i2cs_rearm_counter = uptime_ms();
 			}
 		}
 
@@ -176,6 +178,10 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					i2cs_w_len = 10;
 				} else if (reg == REG_ID_C64_JS) {
 					i2cs_w_buff[1] = js_bits;
+				} else if (reg == REG_ID_RST) {
+					if (is_write)
+						reg_set_value(REG_ID_RST, 1);
+					i2cs_w_buff[1] = reg_get_value(REG_ID_RST);
 				} else if (reg == REG_ID_RST_PICO) {
 					if (is_write)
 						reg_set_value(REG_ID_RST_PICO, 1);
@@ -196,7 +202,7 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 
 				HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, i2cs_w_buff, i2cs_w_len, I2C_FIRST_AND_LAST_FRAME);
 
-				i2cs_rearm_counter = 0;
+				i2cs_rearm_counter = uptime_ms();
 			}
 		}
 	}
@@ -307,8 +313,6 @@ int main(void) {
 		Error_Handler();
 
 	// Check for AXP2101 is accessible on secondary I2C bus
-	//result = HAL_I2C_IsDeviceReady(&hi2c2, 0x68, 3, 40);
-	//if (result == HAL_OK) {
 	result = 0;
 	HAL_I2C_Mem_Read(&hi2c2, 0x68, XPOWERS_AXP2101_IC_TYPE, 1, (uint8_t*)&result, 1, 60);
 	if (result == XPOWERS_AXP2101_CHIP_ID) {
@@ -402,7 +406,7 @@ int main(void) {
 		LL_IWDG_ReloadCounter(IWDG);
 
 		// Re-arm I2CS in case of lost master signal
-		if (i2cs_state != I2CS_STATE_IDLE && i2cs_rearm_counter > I2CS_REARM_TIMEOUT)
+		if (i2cs_state != I2CS_STATE_IDLE && ((uptime_ms() - i2cs_rearm_counter) > I2CS_REARM_TIMEOUT))
 			i2cs_state = I2CS_STATE_IDLE;
 
 		reg_sync();
@@ -411,14 +415,23 @@ int main(void) {
 		hw_check_HP_presence();
 
 		// Check internal status
-		if (reg_get_value(REG_ID_SHTDW) == 1) {
+		if (reg_get_value(REG_ID_SHTDW) == 1) {			// Nominal full system shutdown as requested from I2C bus
 			reg_set_value(REG_ID_SHTDW, 0);
 			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
 			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
 			AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 
 			AXP2101_shutdown();
-		} else if (reg_get_value(REG_ID_RST_PICO) == 1) {
+		} else if (reg_get_value(REG_ID_RST) == 1) {		// Try to reset only the STM32
+			reg_set_value(REG_ID_RST, 0);
+			HAL_Delay(200);		// Wait for final I2C answer
+			if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
+				Error_Handler();
+			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+
+			NVIC_SystemReset();
+		} else if (reg_get_value(REG_ID_RST_PICO) == 1) {		// Reset only the Pico
 			reg_set_value(REG_ID_RST_PICO, 0);
 			HAL_Delay(200);		// Wait for final I2C answer
 			if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
@@ -538,6 +551,77 @@ __STATIC_INLINE void sync_bat(void) {
 	reg_set_value(REG_ID_BAT, pcnt);
 }
 
+#ifdef DEBUG
+__STATIC_INLINE void printPMU(void) {
+	DEBUG_UART_MSG("PMU isCharging: ");
+	if (AXP2101_isCharging())
+		DEBUG_UART_MSG("YES\n\r");
+	else
+		DEBUG_UART_MSG( "NO\n\r");
+
+	DEBUG_UART_MSG("PMU isDischarge: ");
+	if (AXP2101_isDischarge())
+		DEBUG_UART_MSG("YES\n\r");
+	else
+		DEBUG_UART_MSG( "NO\n\r");
+
+	DEBUG_UART_MSG("PMU isStandby: ");
+	if (AXP2101_isStandby())
+		DEBUG_UART_MSG("YES\n\r");
+	else
+		DEBUG_UART_MSG( "NO\n\r");
+
+	DEBUG_UART_MSG("PMU isVbusIn: ");
+	if (AXP2101_isVbusIn())
+		DEBUG_UART_MSG("YES\n\r");
+	else
+		DEBUG_UART_MSG( "NO\n\r");
+
+	DEBUG_UART_MSG("PMU isVbusGood: ");
+	if (AXP2101_isVbusGood())
+		DEBUG_UART_MSG("YES\n\r");
+	else
+		DEBUG_UART_MSG( "NO\n\r");
+
+	DEBUG_UART_MSG("PMU getChargerStatus: ");
+	uint8_t charge_status = AXP2101_getChargerStatus();
+	if (charge_status == XPOWERS_AXP2101_CHG_TRI_STATE) {
+		DEBUG_UART_MSG("tri_charge");
+	} else if (charge_status == XPOWERS_AXP2101_CHG_PRE_STATE) {
+		DEBUG_UART_MSG("pre_charge");
+	} else if (charge_status == XPOWERS_AXP2101_CHG_CC_STATE) {
+		DEBUG_UART_MSG("constant charge");
+	} else if (charge_status == XPOWERS_AXP2101_CHG_CV_STATE) {
+		DEBUG_UART_MSG("constant voltage");
+	} else if (charge_status == XPOWERS_AXP2101_CHG_DONE_STATE) {
+		DEBUG_UART_MSG("charge done");
+	} else if (charge_status == XPOWERS_AXP2101_CHG_STOP_STATE) {
+		DEBUG_UART_MSG("not charging");
+	}
+
+	DEBUG_UART_MSG("PMU getBattVoltage: ");
+	DEBUG_UART_MSG2(AXP2101_getBattVoltage(), 2, 0);
+	DEBUG_UART_MSG("mV\n\r");
+	DEBUG_UART_MSG("PMU getVbusVoltage: ");
+	DEBUG_UART_MSG2(AXP2101_getVbusVoltage(), 2, 0);
+	DEBUG_UART_MSG("mV\n\r");
+	DEBUG_UART_MSG("PMU getSystemVoltage: ");
+	DEBUG_UART_MSG2(AXP2101_getSystemVoltage(), 2, 0);
+	DEBUG_UART_MSG("mV\n\r");
+
+	// The battery percentage may be inaccurate at first use, the PMU will
+	// automatically learn the battery curve and will automatically calibrate the
+	// battery percentage after a charge and discharge cycle
+	if (AXP2101_isBatteryConnect()) {
+		DEBUG_UART_MSG("PMU getBatteryPercent: ");
+		uint8_t pcnt = 0;
+		AXP2101_getBatteryPercent(&pcnt);
+		DEBUG_UART_MSG2(pcnt, 1, 0);
+		DEBUG_UART_MSG("%\n\r");
+	}
+}
+#endif
+
 __STATIC_INLINE void check_pmu_int(void) {
 	if (!pmu_online)
 		return;
@@ -636,23 +720,26 @@ __STATIC_INLINE void check_pmu_int(void) {
 #endif
 			stop_chg();
 		}
+		if (AXP2101_isPekeyShortPressIrq()) {
+#ifdef DEBUG
+			DEBUG_UART_MSG("PMU: isPekeyShortPress\n\r");
 
-		/*if (AXP2101_isPekeyShortPressIrq()) {
-		  Serial1.println("isPekeyShortPress");
-		  // enterPmuSleep();
+			uint8_t data[4] = {0};
+			AXP2101_readDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
+			DEBUG_UART_MSG("PMU data buffer:\n\r");
+			DEBUG_UART_MSG2(data[0], 1, 0);
+			DEBUG_UART_MSG("\n\r");
+			DEBUG_UART_MSG2(data[1], 1, 0);
+			DEBUG_UART_MSG("\n\r");
+			DEBUG_UART_MSG2(data[2], 1, 0);
+			DEBUG_UART_MSG("\n\r");
+			DEBUG_UART_MSG2(data[3], 1, 0);
+			DEBUG_UART_MSG("\n\r");
 
-		  Serial1.print("Read pmu data buffer .");
-		  uint8_t data[4] = {0};
-		  PMU.readDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
-		  for (int i = 0; i < 4; ++i) {
-			Serial1.print(data[i]);
-			Serial1.print(",");
-		  }
-		  Serial1.println();
-
-		  printPMU();
-		}*/
-
+			printPMU();
+#endif
+			// enterPmuSleep();	//TODO: implement sleep mode, RTC, etc.?
+		}
 		if (AXP2101_isPekeyLongPressIrq()) {
 #ifdef DEBUG
 			DEBUG_UART_MSG("PMU: isPekeyLongPress\n\r");

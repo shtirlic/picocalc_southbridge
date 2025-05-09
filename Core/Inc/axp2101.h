@@ -14,11 +14,11 @@
 #define XPOWERS_AXP2101_IC_TYPE                          (0x03)
 
 
-//#define XPOWERS_AXP2101_DATA_BUFFER1                     (0x04)
-//#define XPOWERS_AXP2101_DATA_BUFFER2                     (0x05)
-//#define XPOWERS_AXP2101_DATA_BUFFER3                     (0x06)
-//#define XPOWERS_AXP2101_DATA_BUFFER4                     (0x07)
-//#define XPOWERS_AXP2101_DATA_BUFFER_SIZE                 (4u)
+#define XPOWERS_AXP2101_DATA_BUFFER1                     (0x04)
+#define XPOWERS_AXP2101_DATA_BUFFER2                     (0x05)
+#define XPOWERS_AXP2101_DATA_BUFFER3                     (0x06)
+#define XPOWERS_AXP2101_DATA_BUFFER4                     (0x07)
+#define XPOWERS_AXP2101_DATA_BUFFER_SIZE                 (4u)
 
 #define XPOWERS_AXP2101_COMMON_CONFIG                    (0x10)
 //#define XPOWERS_AXP2101_BATFET_CTRL                      (0x12)
@@ -49,16 +49,16 @@
 //#define XPOWERS_AXP2101_FAST_PWRON_CTRL                  (0x2B)
 
 #define XPOWERS_AXP2101_ADC_CHANNEL_CTRL                 (0x30)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST0                 (0x34)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST1                 (0x35)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST2                 (0x36)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST3                 (0x37)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST4                 (0x38)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST5                 (0x39)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST6                 (0x3A)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST7                 (0x3B)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST8                 (0x3C)
-//#define XPOWERS_AXP2101_ADC_DATA_RELUST9                 (0x3D)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST0                 (0x34)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST1                 (0x35)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST2                 (0x36)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST3                 (0x37)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST4                 (0x38)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST5                 (0x39)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST6                 (0x3A)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST7                 (0x3B)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST8                 (0x3C)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST9                 (0x3D)
 
 /*
  * ------------------ Interrupt registers ---------------------
@@ -266,6 +266,15 @@ typedef enum __xpowers_chg_led_mode {
     XPOWERS_CHG_LED_CTRL_CHG,    // The charging indicator is controlled by the charger
 } xpowers_chg_led_mode_t;
 
+typedef enum {
+    XPOWERS_AXP2101_CHG_TRI_STATE,   //tri_charge
+    XPOWERS_AXP2101_CHG_PRE_STATE,   //pre_charge
+    XPOWERS_AXP2101_CHG_CC_STATE,    //constant charge
+    XPOWERS_AXP2101_CHG_CV_STATE,    //constant voltage
+    XPOWERS_AXP2101_CHG_DONE_STATE,  //charge done
+    XPOWERS_AXP2101_CHG_STOP_STATE,  //not charge
+} xpowers_chg_status_t;
+
 /*
  * ------------- axp2101 interrupt control mask -------------
  */
@@ -325,9 +334,18 @@ uint32_t AXP2101_setLowBatShutdownThreshold(uint8_t opt);
 uint32_t AXP2101_setSysPowerDownVoltage(uint16_t value);
 uint32_t AXP2101_setChargingLedMode(uint8_t mode);
 
+int8_t AXP2101_readDataBuffer(uint8_t *data, uint8_t size);
 uint8_t AXP2101_isBatteryConnect(void);
 uint8_t AXP2101_isCharging(void);
+uint8_t AXP2101_isDischarge(void);
+uint8_t AXP2101_isStandby(void);
+uint8_t AXP2101_isVbusGood(void);
+uint8_t AXP2101_isVbusIn(void);
 uint32_t AXP2101_getIrqStatus(uint32_t* out_value);
 uint32_t AXP2101_getBatteryPercent(uint8_t* out_value);
+xpowers_chg_status_t AXP2101_getChargerStatus(void);
+uint16_t AXP2101_getBattVoltage(void);
+uint16_t AXP2101_getVbusVoltage(void);
+uint16_t AXP2101_getSystemVoltage(void);
 
 #endif /* AXP2101_H_ */
