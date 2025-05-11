@@ -14,6 +14,7 @@
   */
 
 #include "hal_interface.h"
+#include "cmsis_gcc.h"
 #include "axp2101.h"
 #include "backlight.h"
 #include "batt.h"
@@ -39,6 +40,8 @@
 //#define DEBUG_UART_MSG2(d,s)		HAL_UART_Transmit(&huart1, (uint8_t*)d, s, 200)
 #define DEBUG_UART_MSG2(d,sz, swp)	uart_rawdata_write(d,sz,swp)
 #endif
+
+#define STM32F1xxx_BL_ADDR	0x1FFFF000	// STM32 bootloader memory address
 
 
 // Private typedef -----------------------------------------------------------
@@ -83,9 +86,16 @@ static uint32_t head_phone_status = 0;	// TODO: Combine status registers
 volatile uint8_t pmu_irq = 0;
 static uint32_t pmu_online = 0;
 
+struct blvt_t {
+    uint32_t __sp;
+    void (*__bl_call)(void);
+};
+#define STM32F1xxx_BL_VECTOR_TABLE	((struct blvt_t *)STM32F1xxx_BL_ADDR)
+
 
 // Private variables ---------------------------------------------------------
 //static void lock_cb(uint8_t caps_changed, uint8_t num_changed);
+static void reset_to_bootloader(void);
 static void key_cb(char key, enum key_state state);
 static void hw_check_HP_presence(void);
 static void sync_bat(void);
@@ -470,6 +480,43 @@ static void lock_cb(uint8_t caps_changed, uint8_t num_changed) {
 }
 */
 
+
+
+static void reset_to_bootloader(void) {
+	// Disable IRQ to not break everything
+	__disable_irq();
+
+	// Reset the system to a boot state
+	HAL_RCC_DeInit();
+	SysTick->CTRL = 0;
+	SysTick->LOAD = 0;
+	SysTick->VAL = 0;
+
+	for (uint8_t i = 0; i < sizeof(NVIC->ICER) / sizeof(NVIC->ICER[0]); i++) {
+		NVIC->ICER[i]=0xFFFFFFFF;
+		NVIC->ICPR[i]=0xFFFFFFFF;
+	}
+
+	__enable_irq();
+
+	// Relocate the main SP
+	__set_MSP(STM32F1xxx_BL_VECTOR_TABLE->__sp);
+
+	// Remap NVIC
+	//SCB->VTOR = STM32F1xxx_BL_ADDR;
+
+	// Wait for every datas to be ready
+	__ISB();
+	__DSB();
+
+	// Now, jump to the bootloader!
+	STM32F1xxx_BL_VECTOR_TABLE->__bl_call();
+
+	for (;;)
+		// We should never go here...
+		continue;
+}
+
 static void key_cb(char key, enum key_state state) {
 	uint8_t int_trig = 0;
 
@@ -748,10 +795,12 @@ __STATIC_INLINE void check_pmu_int(void) {
 			//uint8_t data[4] = {1, 2, 3, 4};
 			//PMU.writeDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
 
-			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+			reset_to_bootloader();
+
+			/*LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
 			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
 			AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
-			AXP2101_shutdown();
+			AXP2101_shutdown();*/
 		}
 
 		/*if (PMU.isPekeyNegativeIrq()) {
