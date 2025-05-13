@@ -23,27 +23,38 @@ enum reg_id {
 	REG_ID_RST_PICO = 0x0E, // Pico reset
 	REG_ID_SHTDW = 0x0F, // self-shutdown
 	REG_ID_INT_CFG = 0x10, // IRQ config
+	REG_ID_RTC_CFG = 0x11, // RTC general config
+	REG_ID_RTC_DATE = 0x12, // RTC date
+	REG_ID_RTC_TIME = 0x13, // RTC time
+	REG_ID_RTC_ALARM_DATE = 0x14, // RTC alarm date
+	REG_ID_RTC_ALARM_TIME = 0x15, // RTC alarm time
 #else
-	REG_ID_CFG = 0x02,			//!< config
-	REG_ID_INT_CFG = 0x03,		//!< IRQ config
-	REG_ID_INT = 0x04,			//!< interrupt status
-	REG_ID_BKL = 0x05,			//!< backlight steps (0-9)
-	REG_ID_BK2 = 0x06,			//!< keyboard backlight (0-9)
-	REG_ID_DEB = 0x07,			//!< debounce cfg (time in ms)
-	REG_ID_FRQ = 0x08,			//!< poll freq cfg (time in ms)
+	REG_ID_CFG = 0x02,				//!< config
+	REG_ID_INT_CFG = 0x03,			//!< IRQ config
+	REG_ID_INT = 0x04,				//!< interrupt status
+	REG_ID_BKL = 0x05,				//!< backlight steps (0-9)
+	REG_ID_BK2 = 0x06,				//!< keyboard backlight (0-9)
+	REG_ID_DEB = 0x07,				//!< debounce cfg (time in ms)
+	REG_ID_FRQ = 0x08,				//!< poll freq cfg (time in ms)
 
-	REG_ID_KEY = 0x10,			//!< key status
-	REG_ID_FIF = 0x11,			//!< fifo
-	REG_ID_C64_MTX = 0x12,		//!< read c64 matrix
-	REG_ID_C64_JS = 0x13,		//!< joystick io bits
+	REG_ID_RTC_CFG = 0x0A,			//!< RTC general config
+	REG_ID_RTC_DATE = 0x0B,			//!< RTC date
+	REG_ID_RTC_TIME = 0x0C,			//!< RTC time
+	REG_ID_RTC_ALARM_DATE = 0x0D,	//!< RTC alarm date
+	REG_ID_RTC_ALARM_TIME = 0x0E,	//!< RTC alarm time
 
-	REG_ID_RST = 0x20,			//!< STM32 full reset
-	REG_ID_RST_PICO = 0x21,		//!< Pico reset
-	REG_ID_SHTDW = 0x22,		//!< self-shutdown
+	REG_ID_KEY = 0x10,				//!< key status
+	REG_ID_FIF = 0x11,				//!< fifo
+	REG_ID_C64_MTX = 0x12,			//!< read c64 matrix
+	REG_ID_C64_JS = 0x13,			//!< joystick io bits
 
-	REG_ID_BAT = 0x30,			//!< battery
+	REG_ID_RST = 0x20,				//!< STM32 full reset
+	REG_ID_RST_PICO = 0x21,			//!< Pico reset
+	REG_ID_SHTDW = 0x22,			//!< self-shutdown
+
+	REG_ID_BAT = 0x30,				//!< battery
 #endif
-	REG_ID_LAST,
+	REG_ID_LAST
 };
 
 #define CFG_OVERFLOW_ON		(1 << 0) //When a FIFO overflow happens, should the new entry still be pushed, overwriting the oldest one. If 0 then new entry is lost.

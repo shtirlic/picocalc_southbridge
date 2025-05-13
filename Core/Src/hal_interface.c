@@ -23,6 +23,8 @@
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 
+RTC_HandleTypeDef hrtc;
+
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
@@ -140,28 +142,33 @@ static void MX_IWDG_Init(void) {
   * @retval None
   */
 static void MX_RTC_Init(void) {
-	LL_RTC_InitTypeDef RTC_InitStruct = {0};
-	LL_RTC_TimeTypeDef RTC_TimeStruct = {0};
+	RTC_TimeTypeDef sTime = {0};
+	RTC_DateTypeDef DateToUpdate = {0};
 
-	LL_PWR_EnableBkUpAccess();
-	/* Enable BKP CLK enable for backup registers */
-	LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_BKP);
-	/* Peripheral clock enable */
-	LL_RCC_EnableRTC();
-
+	/** Initialize RTC Only
+	*/
+	hrtc.Instance = RTC;
+	hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
+	hrtc.Init.OutPut = RTC_OUTPUTSOURCE_ALARM;
+	if (HAL_RTC_Init(&hrtc) != HAL_OK)
+		Error_Handler();
 
 	/** Initialize RTC and set the Time and Date
 	*/
-	RTC_InitStruct.AsynchPrescaler = 0xFFFFFFFFU;
-	LL_RTC_Init(RTC, &RTC_InitStruct);
-	LL_RTC_SetAsynchPrescaler(RTC, 0xFFFFFFFFU);
+	sTime.Hours = 0x0;
+	sTime.Minutes = 0x0;
+	sTime.Seconds = 0x0;
 
-	/** Initialize RTC and set the Time and Date
-	*/
-	RTC_TimeStruct.Hours = 0;
-	RTC_TimeStruct.Minutes = 0;
-	RTC_TimeStruct.Seconds = 0;
-	LL_RTC_TIME_Init(RTC, LL_RTC_FORMAT_BCD, &RTC_TimeStruct);
+	if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+		Error_Handler();
+
+	DateToUpdate.WeekDay = RTC_WEEKDAY_MONDAY;
+	DateToUpdate.Month = RTC_MONTH_JANUARY;
+	DateToUpdate.Date = 0x1;
+	DateToUpdate.Year = 0x0;
+
+	if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BCD) != HAL_OK)
+		Error_Handler();
 }
 
 /**
@@ -526,6 +533,41 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c) {
 		HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10);
 
 		HAL_GPIO_DeInit(GPIOB, GPIO_PIN_11);
+	}
+}
+
+/**
+  * @brief RTC MSP Initialization
+  * This function configures the hardware resources used in this example
+  * @param hrtc: RTC handle pointer
+  * @retval None
+  */
+void HAL_RTC_MspInit(RTC_HandleTypeDef* hrtc) {
+	if (hrtc->Instance == RTC) {
+		HAL_PWR_EnableBkUpAccess();
+		/* Enable BKP CLK enable for backup registers */
+		__HAL_RCC_BKP_CLK_ENABLE();
+		/* Peripheral clock enable */
+		__HAL_RCC_RTC_ENABLE();
+		/* RTC interrupt Init */
+		HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
+		HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
+	}
+}
+
+/**
+  * @brief RTC MSP De-Initialization
+  * This function freeze the hardware resources used in this example
+  * @param hrtc: RTC handle pointer
+  * @retval None
+  */
+void HAL_RTC_MspDeInit(RTC_HandleTypeDef* hrtc) {
+	if (hrtc->Instance == RTC) {
+		/* Peripheral clock disable */
+		__HAL_RCC_RTC_DISABLE();
+
+		/* RTC interrupt DeInit */
+		HAL_NVIC_DisableIRQ(RTC_Alarm_IRQn);
 	}
 }
 

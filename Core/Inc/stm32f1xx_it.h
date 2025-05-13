@@ -65,6 +65,7 @@ void USART1_IRQHandler(void);
 #ifdef UART_PICO_INTERFACE
 void USART3_IRQHandler(void);
 #endif
+void RTC_Alarm_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

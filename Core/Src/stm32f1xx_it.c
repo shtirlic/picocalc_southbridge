@@ -16,6 +16,7 @@
 
 
 extern I2C_HandleTypeDef hi2c1;
+extern RTC_HandleTypeDef hrtc;
 extern TIM_HandleTypeDef htim2;
 #ifdef DEBUG
 extern UART_HandleTypeDef huart1;
@@ -146,3 +147,10 @@ void USART3_IRQHandler(void) {
 	HAL_UART_IRQHandler(&huart3);
 }
 #endif
+
+/**
+  * @brief This function handles RTC alarm interrupt through EXTI line 17.
+  */
+void RTC_Alarm_IRQHandler(void) {
+	HAL_RTC_AlarmIRQHandler(&hrtc);
+}
