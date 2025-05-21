@@ -324,8 +324,8 @@ uint8_t AXP2101_isDropWarningLevel1Irq(void);
 uint8_t AXP2101_isVbusRemoveIrq(void);
 uint8_t AXP2101_isBatInsertIrq(void);
 uint8_t AXP2101_isBatRemoveIrq(void);
-uint8_t AXP2101_isPekeyShortPressIrq(void);
-uint8_t AXP2101_isPekeyLongPressIrq(void);
+uint8_t AXP2101_isPkeyShortPressIrq(void);
+uint8_t AXP2101_isPkeyLongPressIrq(void);
 uint8_t AXP2101_isBatChargeDoneIrq(void);
 uint8_t AXP2101_isBatChargeStartIrq(void);
 

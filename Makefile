@@ -2,8 +2,9 @@
 # Generic Makefile (based on gcc)
 #
 # ChangeLog :
+#   2025-05-09 - Added I2C_REGS_COMPAT option
 #   2025-04-25 - Tuned for PicoCalc firmware project
-#	2017-02-10 - Several enhancements + project update mode
+#   2017-02-10 - Several enhancements + project update mode
 #   2015-07-22 - first version
 # ------------------------------------------------
 
@@ -61,7 +62,7 @@ Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_pwr.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash_ex.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_exti.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_rtc.c \
+Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rtc.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim_ex.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c \

@@ -173,14 +173,14 @@ uint8_t AXP2101_isBatRemoveIrq(void) {
 	return 0;
 }
 
-uint8_t AXP2101_isPekeyShortPressIrq(void) {
+uint8_t AXP2101_isPkeyShortPressIrq(void) {
 	uint8_t mask = XPOWERS_AXP2101_PKEY_SHORT_IRQ >> 8;
 	if (intRegister[1] & mask)
 		return ((statusRegister[1] & mask) == mask);
 	return 0;
 }
 
-uint8_t AXP2101_isPekeyLongPressIrq(void) {
+uint8_t AXP2101_isPkeyLongPressIrq(void) {
 	uint8_t mask = XPOWERS_AXP2101_PKEY_LONG_IRQ >> 8;
 	if (intRegister[1] & mask)
 		return ((statusRegister[1] & mask) == mask);

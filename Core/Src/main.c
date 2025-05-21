@@ -82,6 +82,9 @@ static enum i2cs_state i2cs_state = I2CS_STATE_IDLE;
 static uint8_t keycb_start = 0;
 static uint32_t head_phone_status = 0;	// TODO: Combine status registers
 
+static volatile RTC_TimeTypeDef rtc_alarm_time = {0};
+static volatile RTC_DateTypeDef rtc_alarm_date = {0};
+
 volatile uint8_t pmu_irq = 0;
 static uint32_t pmu_online = 0;
 
@@ -95,10 +98,10 @@ static void sync_bat(void);
 static void printPMU(void);
 #endif
 static void check_pmu_int(void);
-static void i2cs_fill_buffer_RTC_date(uint8_t* date_buff);
-static void i2cs_fill_buffer_RTC_time(uint8_t* time_buff);
-static void i2cs_RTC_date_from_buffer(uint8_t* date_buff);
-static void i2cs_RTC_time_from_buffer(uint8_t* time_buff);
+static void i2cs_fill_buffer_RTC_date(uint8_t* const buff, const volatile RTC_DateTypeDef* const date_s);
+static void i2cs_fill_buffer_RTC_time(uint8_t* const buff, const volatile RTC_TimeTypeDef* const time_s);
+static void i2cs_RTC_date_from_buffer(volatile RTC_DateTypeDef* const date_s, const uint8_t* const buff);
+static void i2cs_RTC_time_from_buffer(volatile RTC_TimeTypeDef* const time_s, const uint8_t* const buff);
 
 extern void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
@@ -153,6 +156,7 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 						reg_set_value(REG_ID_DEB, 0);	// Trig async flag for EEPROM saving
 					}
 					*((uint16_t*)&i2cs_w_buff[1]) = keyboard_get_hold_period();
+
 					i2cs_w_len = 3;
 				} else if (reg == REG_ID_FRQ) {
 					if (is_write)
@@ -172,15 +176,47 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					i2cs_w_buff[1] = reg_get_value(REG_ID_TYP);
 				} else if (reg == REG_ID_BAT) {
 					i2cs_w_buff[1] = reg_get_value(REG_ID_BAT);
-				} else if (reg == REG_ID_RTC_DATE) {
+				} else if (reg == REG_ID_RTC_CFG) {
 					if (is_write)
-						i2cs_RTC_date_from_buffer(&i2cs_r_buff[1]);
-					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1]);
+						reg_set_value(REG_ID_RTC_CFG, i2cs_r_buff[1]);
+					i2cs_w_buff[1] = reg_get_value(REG_ID_RTC_CFG);
+				} else if (reg == REG_ID_RTC_DATE) {
+					RTC_DateTypeDef date_s = {0};
+					if (is_write) {
+						i2cs_RTC_date_from_buffer(&date_s, &i2cs_r_buff[1]);
+
+						HAL_RTC_SetDate(&hrtc, &date_s, RTC_FORMAT_BIN);
+					}
+
+					HAL_RTC_GetDate(&hrtc, &date_s, RTC_FORMAT_BCD);
+					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &date_s);
+
 					i2cs_w_len = 5;
 				} else if (reg == REG_ID_RTC_TIME) {
+					RTC_TimeTypeDef time_s = {0};
+					if (is_write) {
+						i2cs_RTC_time_from_buffer(&time_s, &i2cs_r_buff[1]);
+
+						HAL_RTC_SetTime(&hrtc, &time_s, RTC_FORMAT_BIN);
+					}
+
+					HAL_RTC_GetTime(&hrtc, &time_s, RTC_FORMAT_BCD);
+					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &time_s);
+
+					i2cs_w_len = 4;
+				} else if (reg == REG_ID_RTC_ALARM_DATE) {
 					if (is_write)
-						i2cs_RTC_time_from_buffer(&i2cs_r_buff[1]);
-					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1]);
+						i2cs_RTC_date_from_buffer(&rtc_alarm_date, &i2cs_r_buff[1]);
+
+					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &rtc_alarm_date);
+
+					i2cs_w_len = 5;
+				} else if (reg == REG_ID_RTC_ALARM_TIME) {
+					if (is_write)
+						i2cs_RTC_time_from_buffer(&rtc_alarm_time, &i2cs_r_buff[1]);
+
+					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &rtc_alarm_time);
+
 					i2cs_w_len = 4;
 				} else if (reg == REG_ID_KEY) {
 					i2cs_w_buff[0] = fifo_count();
@@ -191,6 +227,7 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					*((uint32_t*)(&i2cs_w_buff[1]) + 0) = *((uint32_t*)(io_matrix) + 0);
 					*((uint32_t*)(&i2cs_w_buff[1]) + 1) = *((uint32_t*)(io_matrix) + 1);
 					i2cs_w_buff[9] = io_matrix[8];
+
 					i2cs_w_len = 10;
 				} else if (reg == REG_ID_C64_JS) {
 					i2cs_w_buff[1] = js_bits;
@@ -740,7 +777,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 #endif
 			stop_chg();
 		}
-		if (AXP2101_isPekeyShortPressIrq()) {
+		if (AXP2101_isPkeyShortPressIrq()) {
 #ifdef DEBUG
 			DEBUG_UART_MSG("PMU: isPekeyShortPress\n\r");
 
@@ -760,7 +797,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 #endif
 			// enterPmuSleep();	//TODO: implement sleep mode, RTC, etc.?
 		}
-		if (AXP2101_isPekeyLongPressIrq()) {
+		if (AXP2101_isPkeyLongPressIrq()) {
 #ifdef DEBUG
 			DEBUG_UART_MSG("PMU: isPekeyLongPress\n\r");
 #endif
@@ -829,44 +866,40 @@ __STATIC_INLINE void check_pmu_int(void) {
 	}
 }
 
-__STATIC_INLINE void i2cs_fill_buffer_RTC_date(uint8_t* date_buff) {
-	RTC_DateTypeDef data_s = {0};
+static void i2cs_fill_buffer_RTC_date(uint8_t* const date_buff, const volatile RTC_DateTypeDef* const date_s) {
+	if (date_s == NULL || date_buff == NULL)
+		return;
 
-	HAL_RTC_GetDate(&hrtc, &data_s, RTC_FORMAT_BCD);
-
-	date_buff[0] = data_s.Year;
-	date_buff[1] = data_s.Month;
-	date_buff[2] = data_s.Date;
-	date_buff[3] = data_s.WeekDay;
+	date_buff[0] = date_s->Year;
+	date_buff[1] = date_s->Month;
+	date_buff[2] = date_s->Date;
+	date_buff[3] = date_s->WeekDay;
 }
 
-__STATIC_INLINE void i2cs_fill_buffer_RTC_time(uint8_t* time_buff) {
-	RTC_TimeTypeDef time_s = {0};
+static void i2cs_fill_buffer_RTC_time(uint8_t* const time_buff, const volatile RTC_TimeTypeDef* const time_s) {
+	if (time_s == NULL || time_buff == NULL)
+		return;
 
-	HAL_RTC_GetTime(&hrtc, &time_s, RTC_FORMAT_BCD);
-
-	time_buff[0] = time_s.Hours;
-	time_buff[1] = time_s.Minutes;
-	time_buff[2] = time_s.Seconds;
+	time_buff[0] = time_s->Hours;
+	time_buff[1] = time_s->Minutes;
+	time_buff[2] = time_s->Seconds;
 }
 
-__STATIC_INLINE void i2cs_RTC_date_from_buffer(uint8_t* date_buff) {
-	RTC_DateTypeDef data_s = {0};
+static void i2cs_RTC_date_from_buffer(volatile RTC_DateTypeDef* const date_s, const uint8_t* const date_buff) {
+	if (date_s == NULL || date_buff == NULL)
+		return;
 
-	data_s.Year = date_buff[0] <= 99? date_buff[0] : 99;
-	data_s.Month = (date_buff[1] > 0 && date_buff[1] <= 12)? date_buff[1] : 12;
-	data_s.Date = (date_buff[2] > 0 && date_buff[2] <= 99)? date_buff[2] : 99;
+	date_s->Year = date_buff[0] <= 99? date_buff[0] : 99;
+	date_s->Month = (date_buff[1] > 0 && date_buff[1] <= 12)? date_buff[1] : 12;
+	date_s->Date = (date_buff[2] > 0 && date_buff[2] <= 99)? date_buff[2] : 99;
 	//data_s.WeekDay - this element is automatically recomputed
-
-	HAL_RTC_SetDate(&hrtc, &data_s, RTC_FORMAT_BIN);
 }
 
-__STATIC_INLINE void i2cs_RTC_time_from_buffer(uint8_t* time_buff) {
-	RTC_TimeTypeDef time_s = {0};
+static void i2cs_RTC_time_from_buffer(volatile RTC_TimeTypeDef* const time_s, const uint8_t* const time_buff) {
+	if (time_s == NULL || time_buff == NULL)
+		return;
 
-	time_s.Hours = time_buff[0] <= 23 ? time_buff[0] : 23;
-	time_s.Minutes = time_buff[1] <= 59 ? time_buff[1] : 59;
-	time_s.Seconds = time_buff[2] <= 59 ? time_buff[2] : 59;
-
-	HAL_RTC_SetTime(&hrtc, &time_s, RTC_FORMAT_BIN);
+	time_s->Hours = time_buff[0] <= 23 ? time_buff[0] : 23;
+	time_s->Minutes = time_buff[1] <= 59 ? time_buff[1] : 59;
+	time_s->Seconds = time_buff[2] <= 59 ? time_buff[2] : 59;
 }
