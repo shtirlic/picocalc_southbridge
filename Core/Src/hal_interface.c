@@ -18,6 +18,7 @@
   */
 
 #include "hal_interface.h"
+#include "stm32f1xx_hal_flash_ex.h"
 
 
 I2C_HandleTypeDef hi2c1;
@@ -35,6 +36,9 @@ UART_HandleTypeDef huart1;
 #ifdef UART_PICO_INTERFACE
 UART_HandleTypeDef huart3;
 #endif
+
+volatile RTC_TimeTypeDef_u rtc_alarm_time = {.raw = 0x00000000};
+volatile RTC_DateTypeDef_u rtc_alarm_date = {.raw = 0x00010101};
 
 static void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
@@ -125,7 +129,6 @@ static void MX_I2C2_Init(void) {
   * @retval None
   */
 static void MX_IWDG_Init(void) {
-#ifndef DEBUG
 	LL_IWDG_Enable(IWDG);
 	LL_IWDG_EnableWriteAccess(IWDG);
 	LL_IWDG_SetPrescaler(IWDG, LL_IWDG_PRESCALER_32);
@@ -133,7 +136,6 @@ static void MX_IWDG_Init(void) {
 	while (LL_IWDG_IsReady(IWDG) != 1) {}
 
 	LL_IWDG_ReloadCounter(IWDG);
-#endif
 }
 
 /**
@@ -149,7 +151,7 @@ static void MX_RTC_Init(void) {
 	*/
 	hrtc.Instance = RTC;
 	hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
-	hrtc.Init.OutPut = RTC_OUTPUTSOURCE_ALARM;
+	hrtc.Init.OutPut = RTC_OUTPUTSOURCE_NONE;
 	if (HAL_RTC_Init(&hrtc) != HAL_OK)
 		Error_Handler();
 
@@ -169,6 +171,20 @@ static void MX_RTC_Init(void) {
 
 	if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BCD) != HAL_OK)
 		Error_Handler();
+}
+
+/**
+  * @brief RTC fake initialization Function, used when RTC is already alive (after a wake-up reset)
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init2(void) {
+	hrtc.Instance = RTC;
+	hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
+	hrtc.Init.OutPut = RTC_OUTPUTSOURCE_NONE;
+	hrtc.Lock = HAL_UNLOCKED;
+	HAL_RTC_MspInit(&hrtc);
+	hrtc.State = HAL_RTC_STATE_READY;
 }
 
 /**
@@ -362,7 +378,7 @@ static void MX_GPIO_Init(void) {
 	/**/
 	GPIO_InitStruct.Pin = SYS_LED_Pin;
 	GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
-	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_MEDIUM;
+	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
 	GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_OPENDRAIN;
 	LL_GPIO_Init(SYS_LED_GPIO_Port, &GPIO_InitStruct);
 
@@ -782,7 +798,9 @@ void assert_failed(uint8_t *file, uint32_t line)
 
 void flash_one_time(uint32_t ts, uint8_t restore_status) {
 	for (size_t i = 0; i < ts; i++) {
-		LL_IWDG_ReloadCounter(IWDG);
+//#ifndef DEBUG
+//		LL_IWDG_ReloadCounter(IWDG);
+//#endif
 		LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
 		HAL_Delay(400);
 		LL_GPIO_SetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
@@ -801,6 +819,7 @@ void flash_one_time(uint32_t ts, uint8_t restore_status) {
   */
 HAL_StatusTypeDef HAL_Interface_init(void) {
 	HAL_StatusTypeDef result = HAL_OK;
+	FLASH_OBProgramInitTypeDef flash_s;
 
 	result |= HAL_Init();
 	if (result != HAL_OK)
@@ -808,16 +827,42 @@ HAL_StatusTypeDef HAL_Interface_init(void) {
 
 	SystemClock_Config();
 
+	// Control wake-up state
+	//if (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST))
+	//__HAL_RCC_CLEAR_RESET_FLAGS();
+	// Use SRAM backup registers to check if we have soft-reset
+	HAL_PWR_EnableBkUpAccess();
+
 	MX_GPIO_Init();
 	MX_I2C1_Init();
 	MX_I2C2_Init();
-	MX_RTC_Init();
+	if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) != 0)
+		MX_RTC_Init2();
+	else
+		MX_RTC_Init();
 	MX_USART1_UART_Init();
 	MX_USART3_UART_Init();
-	MX_IWDG_Init();
+//#ifndef DEBUG
+//	MX_IWDG_Init();
+//#endif
 	MX_TIM1_Init();
 	MX_TIM3_Init();
 	MX_TIM2_Init();
+
+	// Check options registers values
+	HAL_FLASHEx_OBGetConfig(&flash_s);
+	//if ((flash_s.USERConfig & (OB_STOP_NO_RST | OB_STDBY_NO_RST)) != 0) {
+	if ((flash_s.USERConfig & (OB_STOP_NO_RST | OB_STDBY_NO_RST)) == 0) {
+		HAL_FLASH_Unlock();
+		HAL_FLASH_OB_Unlock();
+		//flash_s.USERConfig &= (uint8_t)~(OB_STOP_NO_RST | OB_STDBY_NO_RST);	// Enable reset when sleep
+		flash_s.USERConfig |= (uint8_t)(OB_STOP_NO_RST | OB_STDBY_NO_RST);	// Disable reset when sleep
+		HAL_FLASHEx_OBProgram(&flash_s);
+		HAL_FLASH_OB_Launch();	// Reset system
+
+		// We should never reach this point
+		for ( ;; ) {}
+	}
 
 	return result;
 }

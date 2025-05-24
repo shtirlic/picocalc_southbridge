@@ -1,9 +1,12 @@
 #include "regs.h"
 
 #include "hal_interface.h"
+#include "stm32f1xx_hal_rtc_ex.h"
 #include "eeprom.h"
 #include "version.h"
 
+
+extern RTC_HandleTypeDef hrtc;
 
 static uint8_t regs[REG_ID_LAST] = {0};
 static uint8_t regs_unsync[REG_ID_LAST] = {0};
@@ -58,7 +61,7 @@ inline void reg_set_bit(enum reg_id reg, uint8_t bit) {
 | 0      | CFG_OVERFLOW_ON  | When a FIFO overflow happens, should the new entry still be pushed, overwriting the oldest one. If 0 then new entry is lost. |
  */
 void reg_init(void) {
-	uint16_t buff;
+	uint32_t buff;
 
 	regs[REG_ID_VER] = (uint8_t)((VERSION_MAJOR << 4) | VERSION_MINOR);	// 1.2 => (0x1 << 4) | 0x2
 
@@ -73,6 +76,17 @@ void reg_init(void) {
 	EEPROM_ReadVariable(EEPROM_VAR_BCKL, (EEPROM_Value*)&buff);
 	regs[REG_ID_BKL] = (uint8_t)((buff >> 8) & 0xFF);
 	regs[REG_ID_BK2] = (uint8_t)(buff & 0xFF);
+
+	buff = 0;
+	buff |= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
+	buff |= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR3) << 16;
+	regs[REG_ID_RTC_CFG] = (uint8_t)(buff & 0xFF);
+	rtc_alarm_time.raw = (uint8_t)((buff >> 8) & 0xFFFFFF);
+
+	buff = 0;
+	buff |= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR4);
+	buff |= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR5) << 16;
+	rtc_alarm_date.raw = buff;
 
 	regs[REG_ID_BAT] = 0; //default .no battery ,no charging
 
@@ -100,6 +114,16 @@ uint32_t reg_check_and_save_eeprom(void) {
 
 		if (regs_unsync[REG_ID_BKL] == 1 || regs_unsync[REG_ID_BK2] == 1)
 			result |= EEPROM_WriteVariable(EEPROM_VAR_BCKL, (EEPROM_Value)(uint16_t)((regs[REG_ID_BKL] << 8) | regs[REG_ID_BK2]), EEPROM_SIZE16);
+
+		if (regs_unsync[REG_ID_RTC_ALARM_TIME] == 1 || regs_unsync[REG_ID_RTC_CFG] == 1) {
+			HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, ((rtc_alarm_time.raw & 0xFF) << 8) | regs[REG_ID_RTC_CFG]);
+			HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, rtc_alarm_time.raw >> 16);
+		}
+
+		if (regs_unsync[REG_ID_RTC_ALARM_DATE] == 1) {
+			HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, rtc_alarm_date.raw & 0xFFFF);
+			HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5, rtc_alarm_date.raw >> 16);
+		}
 
 		for (size_t i = 0; i < REG_ID_LAST; i++)
 			regs_unsync[i] = 0;

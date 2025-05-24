@@ -128,12 +128,29 @@ extern "C" {
 #define PICO_SDA_GPIO_Port GPIOB
 
 
+// Structure definition ---------------------------------------------------------------
+typedef union {
+    uint32_t raw;
+    RTC_TimeTypeDef _s;
+} RTC_TimeTypeDef_u;
+
+typedef union {
+    uint32_t raw;
+    RTC_DateTypeDef _s;
+} RTC_DateTypeDef_u;
+
+
 // Global variables definition --------------------------------------------------------
 extern volatile uint32_t systicks_counter;
 extern volatile uint8_t pmu_irq;
+extern volatile uint8_t stop_mode_active;
+
+extern volatile RTC_TimeTypeDef_u rtc_alarm_time;
+extern volatile RTC_DateTypeDef_u rtc_alarm_date;
 
 
 // Global functions definition --------------------------------------------------------
+void SystemClock_Config(void);
 HAL_StatusTypeDef HAL_Interface_init(void);
 
 __STATIC_INLINE uint32_t uptime_ms(void) { return systicks_counter; }

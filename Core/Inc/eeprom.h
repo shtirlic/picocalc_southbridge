@@ -11,7 +11,7 @@
 
 #define EEPROM_VAR_ID	(0)			// 16b: Init ID: 0xCA1C
 #define EEPROM_VAR_CFG	(1)			// 16b: CFG(15:8) + INT_CFG(7:0) reg
-#define EEPROM_VAR_KBD	(2)		// 32b: DEB(15:0) + 0x00 + FRQ(7:0) regs
+#define EEPROM_VAR_KBD	(2)			// 32b: DEB(15:0) + 0x00 + FRQ(7:0) regs
 #define EEPROM_VAR_BCKL	(3)			// 16b: LCD(15:8) + KBD(7:0) backlight step indice
 
 //-------------------------------------------library configuration-------------------------------------------

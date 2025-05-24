@@ -11,6 +11,13 @@
   *
   * SYS_LED and COL_x are open-drain, output logic is inverted.
   *
+  * Unless requested by the user through REG_ID_PWR_CTRL register or by removing
+  * the batteries, pressing the power button when running now put the STM32 in
+  * low-power stop mode and shutdown the PICO board.
+  * It's the only mean to keep the RTC functional.
+  * A full shutdown using AXP2101 power-off or by removing the batteries will
+  * reset the RTC and disable auto wake-up feature.
+  *
   */
 
 #include "hal_interface.h"
@@ -21,6 +28,7 @@
 #include "fifo.h"
 #include "keyboard.h"
 #include "regs.h"
+#include "rtc.h"
 
 
 // Private define ------------------------------------------------------------
@@ -30,6 +38,7 @@
 #define DEFAULT_KBD_BL		(0)		//step-1 (0%)
 #define DEFAULT_KBD_FREQ	(KEY_POLL_TIME)
 #define DEFAULT_KBD_DEB		(KEY_HOLD_TIME)
+#define DEFAULT_RCT_CFG		(0x00)
 
 #define I2CS_REARM_TIMEOUT	500
 #define I2CS_W_BUFF_LEN		31+1	// The last one must be only a 0 value, TODO: another cleaner way?
@@ -82,8 +91,9 @@ static enum i2cs_state i2cs_state = I2CS_STATE_IDLE;
 static uint8_t keycb_start = 0;
 static uint32_t head_phone_status = 0;	// TODO: Combine status registers
 
-static volatile RTC_TimeTypeDef rtc_alarm_time = {0};
-static volatile RTC_DateTypeDef rtc_alarm_date = {0};
+static volatile uint8_t rtc_reg_xor_events = 0;
+
+volatile uint8_t stop_mode_active = 0;
 
 volatile uint8_t pmu_irq = 0;
 static uint32_t pmu_online = 0;
@@ -98,10 +108,8 @@ static void sync_bat(void);
 static void printPMU(void);
 #endif
 static void check_pmu_int(void);
-static void i2cs_fill_buffer_RTC_date(uint8_t* const buff, const volatile RTC_DateTypeDef* const date_s);
-static void i2cs_fill_buffer_RTC_time(uint8_t* const buff, const volatile RTC_TimeTypeDef* const time_s);
-static void i2cs_RTC_date_from_buffer(volatile RTC_DateTypeDef* const date_s, const uint8_t* const buff);
-static void i2cs_RTC_time_from_buffer(volatile RTC_TimeTypeDef* const time_s, const uint8_t* const buff);
+static void sys_prepare_sleep(void);
+static void sys_wake_sleep(void);
 
 extern void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
@@ -168,6 +176,8 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					i2cs_w_buff[0] = item.state;
 					i2cs_w_buff[1] = item.key;
 				} else if (reg == REG_ID_INT) {
+					if (is_write)
+						reg_set_value(REG_ID_INT, 0);
 					i2cs_w_buff[1] = reg_get_value(REG_ID_INT);
 					LL_GPIO_SetOutputPin(PICO_IRQ_GPIO_Port, PICO_IRQ_Pin);	// De-assert the IRQ signal
 				} else if (reg == REG_ID_VER) {
@@ -177,8 +187,10 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 				} else if (reg == REG_ID_BAT) {
 					i2cs_w_buff[1] = reg_get_value(REG_ID_BAT);
 				} else if (reg == REG_ID_RTC_CFG) {
-					if (is_write)
+					if (is_write) {
+						rtc_reg_xor_events |= reg_get_value(REG_ID_RTC_CFG) ^ i2cs_r_buff[1];	// Using a "OR" set style to avoid loosing change before processing it
 						reg_set_value(REG_ID_RTC_CFG, i2cs_r_buff[1]);
+					}
 					i2cs_w_buff[1] = reg_get_value(REG_ID_RTC_CFG);
 				} else if (reg == REG_ID_RTC_DATE) {
 					RTC_DateTypeDef date_s = {0};
@@ -206,16 +218,16 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					i2cs_w_len = 4;
 				} else if (reg == REG_ID_RTC_ALARM_DATE) {
 					if (is_write)
-						i2cs_RTC_date_from_buffer(&rtc_alarm_date, &i2cs_r_buff[1]);
+						i2cs_RTC_date_from_buffer(&rtc_alarm_date._s, &i2cs_r_buff[1]);
 
-					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &rtc_alarm_date);
+					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &rtc_alarm_date._s);
 
 					i2cs_w_len = 5;
 				} else if (reg == REG_ID_RTC_ALARM_TIME) {
 					if (is_write)
-						i2cs_RTC_time_from_buffer(&rtc_alarm_time, &i2cs_r_buff[1]);
+						i2cs_RTC_time_from_buffer(&rtc_alarm_time._s, &i2cs_r_buff[1]);
 
-					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &rtc_alarm_time);
+					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &rtc_alarm_time._s);
 
 					i2cs_w_len = 4;
 				} else if (reg == REG_ID_KEY) {
@@ -231,20 +243,10 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					i2cs_w_len = 10;
 				} else if (reg == REG_ID_C64_JS) {
 					i2cs_w_buff[1] = js_bits;
-				} else if (reg == REG_ID_RST) {
+				} else if (reg == REG_ID_PWR_CTRL) {
 					if (is_write)
-						reg_set_value(REG_ID_RST, 1);
-					i2cs_w_buff[1] = reg_get_value(REG_ID_RST);
-				} else if (reg == REG_ID_RST_PICO) {
-					if (is_write)
-						reg_set_value(REG_ID_RST_PICO, 1);
-					i2cs_w_buff[1] = reg_get_value(REG_ID_RST_PICO);
-				} else if (reg == REG_ID_SHTDW) {
-					if (is_write) {
-						reg_set_value(REG_ID_SHTDW, 1);
-						return;		// Ignore answer, everything will be shutdown
-					}
-					i2cs_w_buff[1] = 0;
+						reg_set_value(REG_ID_PWR_CTRL, i2cs_r_buff[1]);
+					i2cs_w_buff[1] = reg_get_value(REG_ID_PWR_CTRL);
 				} else {
 					i2cs_w_buff[0] = 0;
 					i2cs_w_buff[1] = 0;
@@ -338,11 +340,11 @@ int main(void) {
 	if (result != HAL_OK)
 		Error_Handler();
 
-	LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);	// I'm alive!
-
 	// Start the systick timer
 	if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK)
 		Error_Handler();
+
+	LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);	// I'm alive!
 
 	// EEPROM emulation init
 	if (EEPROM_Init() != EEPROM_SUCCESS)
@@ -361,6 +363,15 @@ int main(void) {
 #ifdef DEBUG
 		DEBUG_UART_MSG("EEPROM first start!\n\r");
 #endif
+	}
+
+	// Check RTC SRAM first run
+	if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) == 0) {
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0xCA1C);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, ((rtc_alarm_time.raw & 0xFF) << 8) | DEFAULT_RCT_CFG);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, rtc_alarm_time.raw >> 16);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, rtc_alarm_date.raw & 0xFFFF);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5, rtc_alarm_date.raw >> 16);
 	}
 
 	// I2C-Pico interface registers
@@ -431,6 +442,7 @@ int main(void) {
 	AXP2101_clearIrqStatus();
 	AXP2101_enableIRQ(XPOWERS_AXP2101_BAT_INSERT_IRQ |
 					XPOWERS_AXP2101_BAT_REMOVE_IRQ |  // BATTERY
+					XPOWERS_AXP2101_WARNING_LEVEL1_IRQ |
 					XPOWERS_AXP2101_VBUS_INSERT_IRQ |
 					XPOWERS_AXP2101_VBUS_REMOVE_IRQ |  // VBUS
 					XPOWERS_AXP2101_PKEY_SHORT_IRQ |
@@ -460,7 +472,9 @@ int main(void) {
 	low_bat();
 
 	while (1) {
-		LL_IWDG_ReloadCounter(IWDG);
+//#ifndef DEBUG
+//		LL_IWDG_ReloadCounter(IWDG);
+//#endif
 
 		// Re-arm I2CS in case of lost master signal
 		if (i2cs_state != I2CS_STATE_IDLE && ((uptime_ms() - i2cs_rearm_counter) > I2CS_REARM_TIMEOUT))
@@ -471,36 +485,89 @@ int main(void) {
 		keyboard_process();
 		hw_check_HP_presence();
 
+		// Check RTC new events to process
+		if (rtc_reg_xor_events != 0) {
+			if ((rtc_reg_xor_events & RTC_CFG_RUN_ALARM) == RTC_CFG_RUN_ALARM) {
+				if (reg_get_value(REG_ID_RTC_CFG) & RTC_CFG_RUN_ALARM) {
+					if (rtc_run_alarm() != HAL_OK)
+						reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) & (uint8_t)~RTC_CFG_RUN_ALARM);
+				} else {
+					if (rtc_stop_alarm() != HAL_OK)
+						reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) | RTC_CFG_RUN_ALARM);
+				}
+
+				rtc_reg_xor_events &= (uint8_t)~RTC_CFG_RUN_ALARM;
+			}
+		}
+
 		// Check internal status
-		if (reg_get_value(REG_ID_SHTDW) == 1) {			// Nominal full system shutdown as requested from I2C bus
-			reg_set_value(REG_ID_SHTDW, 0);
+		switch (reg_get_value(REG_ID_PWR_CTRL)) {
+			case 1:
+				reg_set_value(REG_ID_PWR_CTRL, 0);
+				HAL_Delay(200);		// Wait for final I2C answer
+				if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
+					Error_Handler();
+				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+
+				HAL_Delay(200);		// No need to use keyboard, so a simple delay should suffice
+				LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+				LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+				if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+					Error_Handler();
+				break; 
+
+			case 2:
+				reg_set_value(REG_ID_PWR_CTRL, 0);
+				HAL_Delay(200);		// Wait for final I2C answer
+				if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
+					Error_Handler();
+				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+
+				NVIC_SystemReset();
+				break;
+
+			//case 3:
+
+			case 4:
+				reg_set_value(REG_ID_PWR_CTRL, 0);
+				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+
+				stop_mode_active = 1;
+				break;
+
+			case 5:
+				reg_set_value(REG_ID_PWR_CTRL, 0);
+				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+
+				AXP2101_shutdown();		// Full shudown will rip the RTC configuration! Need to be reset at next reboot.
+				break;
+
+			default:
+				break;
+		}
+
+		if (stop_mode_active == 1) {
+			/* Prepare peripherals to the low-power mode */
+			sys_prepare_sleep();
+
+			/* Low-power mode entry */
+			//HAL_WWDG_Disable();
+			HAL_SuspendTick();
+			HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
+			SystemClock_Config();
+			HAL_ResumeTick();
 			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
 			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-			AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+			HAL_Delay(500);
 
-			AXP2101_shutdown();
-		} else if (reg_get_value(REG_ID_RST) == 1) {		// Try to reset only the STM32
-			reg_set_value(REG_ID_RST, 0);
-			HAL_Delay(200);		// Wait for final I2C answer
-			if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
-				Error_Handler();
-			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-
-			NVIC_SystemReset();
-		} else if (reg_get_value(REG_ID_RST_PICO) == 1) {		// Reset only the Pico
-			reg_set_value(REG_ID_RST_PICO, 0);
-			HAL_Delay(200);		// Wait for final I2C answer
-			if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
-				Error_Handler();
-			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-
-			HAL_Delay(200);		// No need to use keyboard, so a simple delay should suffice
-			LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-			LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-			if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
-				Error_Handler();
+			/* Wake-up peripherals from low-power mode */
+			sys_wake_sleep();
 		}
 	}
 }
@@ -795,7 +862,13 @@ __STATIC_INLINE void check_pmu_int(void) {
 
 			printPMU();
 #endif
-			// enterPmuSleep();	//TODO: implement sleep mode, RTC, etc.?
+			if (stop_mode_active == 1) {
+				stop_mode_active = 0;
+				LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+				LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+			} else {
+			// enterPmuSleep();	//TODO: replace by pico reset if Shift key is pressed
+			}
 		}
 		if (AXP2101_isPkeyLongPressIrq()) {
 #ifdef DEBUG
@@ -805,10 +878,16 @@ __STATIC_INLINE void check_pmu_int(void) {
 			//uint8_t data[4] = {1, 2, 3, 4};
 			//PMU.writeDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
 
-			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-			AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
-			AXP2101_shutdown();
+			if (stop_mode_active == 1) {
+				stop_mode_active = 0;
+				LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+				LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+			} else {
+				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
+				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+				stop_mode_active = 1;
+			}
 		}
 
 		/*if (PMU.isPekeyNegativeIrq()) {
@@ -866,40 +945,48 @@ __STATIC_INLINE void check_pmu_int(void) {
 	}
 }
 
-static void i2cs_fill_buffer_RTC_date(uint8_t* const date_buff, const volatile RTC_DateTypeDef* const date_s) {
-	if (date_s == NULL || date_buff == NULL)
-		return;
+__STATIC_INLINE void sys_prepare_sleep(void) {
+	LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-	date_buff[0] = date_s->Year;
-	date_buff[1] = date_s->Month;
-	date_buff[2] = date_s->Date;
-	date_buff[3] = date_s->WeekDay;
+	AXP2101_disableIRQ(XPOWERS_AXP2101_ALL_IRQ);
+	AXP2101_clearIrqStatus();
+	AXP2101_enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ |
+					XPOWERS_AXP2101_PKEY_LONG_IRQ |
+					XPOWERS_AXP2101_WARNING_LEVEL1_IRQ
+	);
+	lcd_backlight_off();
+	kbd_backlight_off();
+	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
+	GPIO_InitStruct.Pin = SYS_LED_Pin;
+	GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
+	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
+	GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
+	LL_GPIO_Init(SYS_LED_GPIO_Port, &GPIO_InitStruct);
+	LL_GPIO_SetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
 }
 
-static void i2cs_fill_buffer_RTC_time(uint8_t* const time_buff, const volatile RTC_TimeTypeDef* const time_s) {
-	if (time_s == NULL || time_buff == NULL)
-		return;
+__STATIC_INLINE void sys_wake_sleep(void) {
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-	time_buff[0] = time_s->Hours;
-	time_buff[1] = time_s->Minutes;
-	time_buff[2] = time_s->Seconds;
-}
-
-static void i2cs_RTC_date_from_buffer(volatile RTC_DateTypeDef* const date_s, const uint8_t* const date_buff) {
-	if (date_s == NULL || date_buff == NULL)
-		return;
-
-	date_s->Year = date_buff[0] <= 99? date_buff[0] : 99;
-	date_s->Month = (date_buff[1] > 0 && date_buff[1] <= 12)? date_buff[1] : 12;
-	date_s->Date = (date_buff[2] > 0 && date_buff[2] <= 99)? date_buff[2] : 99;
-	//data_s.WeekDay - this element is automatically recomputed
-}
-
-static void i2cs_RTC_time_from_buffer(volatile RTC_TimeTypeDef* const time_s, const uint8_t* const time_buff) {
-	if (time_s == NULL || time_buff == NULL)
-		return;
-
-	time_s->Hours = time_buff[0] <= 23 ? time_buff[0] : 23;
-	time_s->Minutes = time_buff[1] <= 59 ? time_buff[1] : 59;
-	time_s->Seconds = time_buff[2] <= 59 ? time_buff[2] : 59;
+	GPIO_InitStruct.Pin = SYS_LED_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_MEDIUM;
+	HAL_GPIO_Init(SYS_LED_GPIO_Port, &GPIO_InitStruct);
+	LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
+	LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
+	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+	HAL_Delay(300);
+	kbd_backlight_on();
+	lcd_backlight_on();
+	AXP2101_enableIRQ(XPOWERS_AXP2101_BAT_INSERT_IRQ |
+					XPOWERS_AXP2101_BAT_REMOVE_IRQ |  // BATTERY
+					XPOWERS_AXP2101_VBUS_INSERT_IRQ |
+					XPOWERS_AXP2101_VBUS_REMOVE_IRQ |  // VBUS
+					XPOWERS_AXP2101_PKEY_SHORT_IRQ |
+					XPOWERS_AXP2101_PKEY_LONG_IRQ |  // POWER KEY
+					XPOWERS_AXP2101_BAT_CHG_DONE_IRQ |
+					XPOWERS_AXP2101_BAT_CHG_START_IRQ  // CHARGE
+	);
 }
