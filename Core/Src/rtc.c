@@ -12,7 +12,7 @@ extern void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc) {
 	uint8_t date_valid = 1;
 
 	if ((rtc_conf & RTC_CFG_DATE_ALARM) == RTC_CFG_DATE_ALARM) {
-		HAL_RTC_GetDate(hrtc, &date_s, RTC_FORMAT_BCD);
+		HAL_RTC_GetDate(hrtc, &date_s, RTC_FORMAT_BIN);
 		if (date_s.Year != rtc_alarm_date._s.Year ||
 			date_s.Month != rtc_alarm_date._s.Month ||
 			date_s.Date != rtc_alarm_date._s.Date)
@@ -73,7 +73,7 @@ inline uint32_t rtc_run_alarm(void) {
 	alarm_s.AlarmTime.Hours = rtc_alarm_time._s.Hours;
 	alarm_s.AlarmTime.Minutes = rtc_alarm_time._s.Minutes;
 	alarm_s.AlarmTime.Seconds = rtc_alarm_time._s.Seconds;
-	return (uint32_t)HAL_RTC_SetAlarm_IT(&hrtc, &alarm_s, RTC_FORMAT_BCD);
+	return (uint32_t)HAL_RTC_SetAlarm_IT(&hrtc, &alarm_s, RTC_FORMAT_BIN);
 }
 
 inline uint32_t rtc_stop_alarm(void) {

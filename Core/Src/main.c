@@ -200,7 +200,7 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 						HAL_RTC_SetDate(&hrtc, &date_s, RTC_FORMAT_BIN);
 					}
 
-					HAL_RTC_GetDate(&hrtc, &date_s, RTC_FORMAT_BCD);
+					HAL_RTC_GetDate(&hrtc, &date_s, RTC_FORMAT_BIN);
 					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &date_s);
 
 					i2cs_w_len = 5;
@@ -212,7 +212,7 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 						HAL_RTC_SetTime(&hrtc, &time_s, RTC_FORMAT_BIN);
 					}
 
-					HAL_RTC_GetTime(&hrtc, &time_s, RTC_FORMAT_BCD);
+					HAL_RTC_GetTime(&hrtc, &time_s, RTC_FORMAT_BIN);
 					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &time_s);
 
 					i2cs_w_len = 4;
@@ -280,14 +280,15 @@ extern void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 				reg == REG_ID_FRQ) {
 				if (is_write)
 					bytes_needed = 1;
-
 			} else if (reg == REG_ID_DEB) {
 				if (is_write)
 					bytes_needed = 2;
-			} else if (reg == REG_ID_RTC_TIME ||
-				reg == REG_ID_RTC_DATE) {
+			} else if (reg == REG_ID_RTC_DATE ||
+					reg == REG_ID_RTC_ALARM_DATE ||
+					reg == REG_ID_RTC_TIME ||
+					reg == REG_ID_RTC_ALARM_TIME) {
 				if (is_write)
-					bytes_needed = 4;
+					bytes_needed = 3;
 			}
 
 			if (bytes_needed > 0)
