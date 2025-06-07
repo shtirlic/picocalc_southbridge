@@ -152,27 +152,27 @@ static void transition_to(struct list_item * const p_item, const enum key_state 
 
 	switch (p_entry->mod) {
 	case MOD_ALT:
-		if (reg_is_bit_set(REG_ID_CFG, CFG_REPORT_MODS))
+		if (reg_is_bit_set(REG_ID_SYS_CFG, CFG_REPORT_MODS))
 			chr = KEY_MOD_ALT;
 		break;
 
     case MOD_SHL:
-		if (reg_is_bit_set(REG_ID_CFG, CFG_REPORT_MODS))
+		if (reg_is_bit_set(REG_ID_SYS_CFG, CFG_REPORT_MODS))
 			chr = KEY_MOD_SHL;
 		break;
 
     case MOD_SHR:
-		if (reg_is_bit_set(REG_ID_CFG, CFG_REPORT_MODS))
+		if (reg_is_bit_set(REG_ID_SYS_CFG, CFG_REPORT_MODS))
 			chr = KEY_MOD_SHR;
 		break;
 
     case MOD_SYM:
-		if (reg_is_bit_set(REG_ID_CFG, CFG_REPORT_MODS))
+		if (reg_is_bit_set(REG_ID_SYS_CFG, CFG_REPORT_MODS))
 			chr = KEY_MOD_SYM;
 		break;
 
     case MOD_CTRL:
-		if (reg_is_bit_set(REG_ID_CFG, CFG_REPORT_MODS))
+		if (reg_is_bit_set(REG_ID_SYS_CFG, CFG_REPORT_MODS))
 			chr = KEY_MOD_CTRL;
 		break;
 
@@ -182,7 +182,7 @@ static void transition_to(struct list_item * const p_item, const enum key_state 
     		capslock_changed = 1;
 		}
 
-    	if (reg_is_bit_set(REG_ID_CFG, CFG_USE_MODS)) {
+    	if (reg_is_bit_set(REG_ID_SYS_CFG, CFG_USE_MODS)) {
 			const uint8_t shift = (mods[MOD_SHL] || mods[MOD_SHR]);
 			const uint8_t alt = mods[MOD_ALT] | numlock;
 			//const uint8_t ctrl = mods[MOD_CTRL];

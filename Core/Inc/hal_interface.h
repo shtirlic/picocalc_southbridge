@@ -145,6 +145,7 @@ extern volatile uint32_t systicks_counter;
 extern volatile uint8_t pmu_irq;
 extern volatile uint8_t stop_mode_active;
 
+extern volatile uint8_t rtc_reg_xor_events;
 extern volatile RTC_TimeTypeDef_u rtc_alarm_time;
 extern volatile RTC_DateTypeDef_u rtc_alarm_date;
 

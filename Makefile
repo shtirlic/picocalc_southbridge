@@ -45,6 +45,7 @@ Core/Src/batt.c \
 Core/Src/eeprom.c \
 Core/Src/fifo.c \
 Core/Src/keyboard.c \
+Core/Src/i2cs.c \
 Core/Src/regs.c \
 Core/Src/rtc.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio_ex.c \

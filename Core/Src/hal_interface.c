@@ -37,6 +37,7 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
 #endif
 
+volatile uint8_t rtc_reg_xor_events = 0;
 volatile RTC_TimeTypeDef_u rtc_alarm_time = {.raw = 0x00000000};
 volatile RTC_DateTypeDef_u rtc_alarm_date = {.raw = 0x00010101};
 
