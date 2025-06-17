@@ -70,7 +70,7 @@ void reg_init(void) {
 
 	regs[REG_ID_VER] = (uint8_t)((VERSION_MAJOR << 4) | VERSION_MINOR);	// 1.2 => (0x1 << 4) | 0x2
 
-	EEPROM_ReadVariable(REG_ID_SYS_CFG, (EEPROM_Value*)&buff);
+	EEPROM_ReadVariable(EEPROM_VAR_CFG, (EEPROM_Value*)&buff);
 	regs[REG_ID_SYS_CFG] = (uint8_t)((buff >> 8) & 0xFF);
 	regs[REG_ID_INT_CFG] = (uint8_t)(buff & 0xFF);
 

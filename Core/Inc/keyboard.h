@@ -85,6 +85,8 @@ uint8_t keyboard_get_capslock(void);
 uint8_t keyboard_get_numlock(void);
 uint16_t keyboard_get_hold_period(void);
 void keyboard_set_hold_period(uint16_t);
+uint8_t keyboard_get_shift(void);
+uint8_t keyboard_get_alt(void);
 void keyboard_process(void);
 
 

@@ -86,6 +86,12 @@ typedef struct {
 #define INT_KEY				(1 << 3)
 #define INT_PANIC			(1 << 4)
 
+#define PWR_CTRL_PICO_RST	(1)		//!< Request a pico power reset
+#define PWR_CTRL_FULL_RST	(2)		//!< Request a full power reset (pico + stm32)
+//#define PWR_CTRL_RESERVED	(3)
+#define PWR_CTRL_SLEEP		(4)		//!< Request a standard power off (stop pico, stm32 in sleep state)
+#define PWR_CTRL_SHUTDOWN	(5)		//!< Request a full shutdown of the picocalc (PMIC shutdown)
+
 #define KEY_CAPSLOCK		(1 << 5)
 #define KEY_NUMLOCK			(1 << 6)
 #define KEY_COUNT_MASK		0x1F  //0x1F == 31

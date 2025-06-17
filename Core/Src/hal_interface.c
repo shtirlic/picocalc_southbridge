@@ -775,7 +775,7 @@ void Error_Handler(void) {
 	//TODO: replace with dedicated, non-blocking, error handler
 	__disable_irq();
 	while (1) {
-		//LL_GPIO_TogglePin(SYS_LED_GPIO_Port, SYS_LED_Pin);
+		LL_GPIO_SetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
 		HAL_Delay(500);
 	}
 }

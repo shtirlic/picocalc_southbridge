@@ -139,6 +139,14 @@ inline void keyboard_set_hold_period(uint16_t value) {
 	hold_period = value;
 }
 
+inline uint8_t keyboard_get_shift(void) {
+	return (mods[MOD_SHL] || mods[MOD_SHR]);
+}
+
+inline uint8_t keyboard_get_alt(void) {
+	return (mods[MOD_ALT] | numlock);
+}
+
 static void transition_to(struct list_item * const p_item, const enum key_state next_state) {
 	uint8_t output = 1;
 	const struct entry * const p_entry = p_item->p_entry;

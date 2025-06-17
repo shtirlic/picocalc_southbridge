@@ -90,8 +90,12 @@ static void sync_bat(void);
 static void printPMU(void);
 #endif
 static void check_pmu_int(void);
+static void rtc_ctrl_reg_check(void);
+static void pwr_ctrl_reg_check(void);
 static void sys_prepare_sleep(void);
 static void sys_wake_sleep(void);
+static void sys_stop_pico(void);
+static void sys_start_pico(void);
 
 extern void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
@@ -200,14 +204,11 @@ int main(void) {
 #endif
 	keyboard_set_key_callback(key_cb);
 
-	// Enable PICO power
-	LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
+	// PICO MCU start
+	sys_start_pico();
 #ifdef DEBUG
 	DEBUG_UART_MSG("Pico started\n\r");
 #endif
-
-	// Enable speaker Amp. power
-	LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
 
 	HAL_Delay(500);
 	lcd_backlight_on();
@@ -271,76 +272,13 @@ int main(void) {
 		check_pmu_int();
 		keyboard_process();
 		hw_check_HP_presence();
+		rtc_ctrl_reg_check();
+		pwr_ctrl_reg_check();
 
-		// Check RTC new events to process
-		if (rtc_reg_xor_events != 0) {
-			if ((rtc_reg_xor_events & RTC_CFG_RUN_ALARM) == RTC_CFG_RUN_ALARM) {
-				if (reg_get_value(REG_ID_RTC_CFG) & RTC_CFG_RUN_ALARM) {
-					if (rtc_run_alarm() != HAL_OK)
-						reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) & (uint8_t)~RTC_CFG_RUN_ALARM);
-				} else {
-					if (rtc_stop_alarm() != HAL_OK)
-						reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) | RTC_CFG_RUN_ALARM);
-				}
-
-				rtc_reg_xor_events &= (uint8_t)~RTC_CFG_RUN_ALARM;
-			}
-		}
-
-		// Check internal status
-		switch (reg_get_value(REG_ID_PWR_CTRL)) {
-			case 1:
-				reg_set_value(REG_ID_PWR_CTRL, 0);
-				HAL_Delay(200);		// Wait for final I2C answer
-				if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
-					Error_Handler();
-				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-
-				HAL_Delay(200);		// No need to use keyboard, so a simple delay should suffice
-				LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-				LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-				if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
-					Error_Handler();
-				break; 
-
-			case 2:
-				reg_set_value(REG_ID_PWR_CTRL, 0);
-				HAL_Delay(200);		// Wait for final I2C answer
-				if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
-					Error_Handler();
-				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-
-				NVIC_SystemReset();
-				break;
-
-			//case 3:
-
-			case 4:
-				reg_set_value(REG_ID_PWR_CTRL, 0);
-				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
-
-				stop_mode_active = 1;
-				break;
-
-			case 5:
-				reg_set_value(REG_ID_PWR_CTRL, 0);
-				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
-
-				AXP2101_shutdown();		// Full shudown will rip the RTC configuration! Need to be reset at next reboot.
-				break;
-
-			default:
-				break;
-		}
-
+		// Execute stop/sleep mode if requested
 		if (stop_mode_active == 1) {
 			/* Prepare peripherals to the low-power mode */
+			sys_stop_pico();
 			sys_prepare_sleep();
 
 			/* Low-power mode entry */
@@ -349,12 +287,11 @@ int main(void) {
 			HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
 			SystemClock_Config();
 			HAL_ResumeTick();
-			LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-			LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-			HAL_Delay(500);
+			HAL_Delay(300);
 
 			/* Wake-up peripherals from low-power mode */
 			sys_wake_sleep();
+			sys_start_pico();
 		}
 	}
 }
@@ -582,7 +519,6 @@ __STATIC_INLINE void check_pmu_int(void) {
 
 		// When the set low-voltage battery percentage shutdown threshold is reached
 		// set the threshold through setLowBatShutdownThreshold()
-		//This is related to the battery charging and discharging logic. If you're not sure what you're doing, please don't modify it, as it could damage the battery.
 		if (AXP2101_isDropWarningLevel1Irq()) {
 #ifdef DEBUG
 			DEBUG_UART_MSG("PMU: isDropWarningLevel1\n\r");
@@ -591,19 +527,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 			//
 			AXP2101_shutdown();
 		}
-		/*if (PMU.isGaugeWdtTimeoutIrq()) {
-		  Serial1.println("isWdtTimeout");
-		}
-		if (PMU.isBatChargerOverTemperatureIrq()) {
-		  Serial1.println("isBatChargeOverTemperature");
-		}
-		if (PMU.isBatWorkOverTemperatureIrq()) {
-		  Serial1.println("isBatWorkOverTemperature");
-		}
-		if (PMU.isBatWorkUnderTemperatureIrq()) {
-		  Serial1.println("isBatWorkUnderTemperature");
-		}
-		if (PMU.isVbusInsertIrq()) {
+		/*if (PMU.isVbusInsertIrq()) {
 		  Serial1.println("isVbusInsert");
 		}*/
 		if (AXP2101_isVbusRemoveIrq()) {
@@ -612,6 +536,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 #endif
 			stop_chg();
 		}
+
 		if (AXP2101_isBatInsertIrq()) {
 			AXP2101_getBatteryPercent(&pcnt);
 			if (pcnt > 100) {  // disconnect
@@ -624,6 +549,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 			DEBUG_UART_MSG("PMU: isBatInsert\n\r");
 #endif
 		}
+
 		if (AXP2101_isBatRemoveIrq()) {
 			reg_set_value(REG_ID_BAT,0);
 #ifdef DEBUG
@@ -631,6 +557,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 #endif
 			stop_chg();
 		}
+
 		if (AXP2101_isPkeyShortPressIrq()) {
 #ifdef DEBUG
 			DEBUG_UART_MSG("PMU: isPekeyShortPress\n\r");
@@ -651,12 +578,12 @@ __STATIC_INLINE void check_pmu_int(void) {
 #endif
 			if (stop_mode_active == 1) {
 				stop_mode_active = 0;
-				LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-				LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
 			} else {
-			// enterPmuSleep();	//TODO: replace by pico reset if Shift key is pressed
+				if (keyboard_get_shift() && (reg_get_value(REG_ID_PWR_CTRL) == 0))
+					reg_set_value(REG_ID_PWR_CTRL, PWR_CTRL_PICO_RST);
 			}
 		}
+
 		if (AXP2101_isPkeyLongPressIrq()) {
 #ifdef DEBUG
 			DEBUG_UART_MSG("PMU: isPekeyLongPress\n\r");
@@ -667,29 +594,12 @@ __STATIC_INLINE void check_pmu_int(void) {
 
 			if (stop_mode_active == 1) {
 				stop_mode_active = 0;
-				LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
-				LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
 			} else {
-				LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);
-				LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);
 				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 				stop_mode_active = 1;
 			}
 		}
 
-		/*if (PMU.isPekeyNegativeIrq()) {
-		  Serial1.println("isPekeyNegative");
-		}
-		if (PMU.isPekeyPositiveIrq()) {
-		  Serial1.println("isPekeyPositive");
-		}
-
-		if (PMU.isLdoOverCurrentIrq()) {
-		  Serial1.println("isLdoOverCurrentIrq");
-		}
-		if (PMU.isBatfetOverCurrentIrq()) {
-		  Serial1.println("isBatfetOverCurrentIrq");
-		}*/
 		if (AXP2101_isBatChargeDoneIrq()) {
 			AXP2101_getBatteryPercent(&pcnt);
 			if (pcnt > 100) {  // disconnect
@@ -703,6 +613,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 #endif
 			stop_chg();
 		}
+
 		if (AXP2101_isBatChargeStartIrq()) {
 			AXP2101_getBatteryPercent(&pcnt);
 			if (pcnt > 100) {  // disconnect
@@ -717,34 +628,100 @@ __STATIC_INLINE void check_pmu_int(void) {
 			if(AXP2101_isBatteryConnect())
 				start_chg();
 		}
-		/*if (PMU.isBatDieOverTemperatureIrq()) {
-		  Serial1.println("isBatDieOverTemperature");
-		}
-		if (PMU.isChagerOverTimeoutIrq()) {
-		  Serial1.println("isChagerOverTimeout");
-		}
-		if (PMU.isBatOverVoltageIrq()) {
-		  Serial1.println("isBatOverVoltage");
-		}*/
 
 		// Clear PMU Interrupt Status Register
 		AXP2101_clearIrqStatus();
 	}
 }
 
+__STATIC_INLINE void rtc_ctrl_reg_check(void) {
+	if (rtc_reg_xor_events != 0) {
+		if ((rtc_reg_xor_events & RTC_CFG_RUN_ALARM) == RTC_CFG_RUN_ALARM) {
+			if (reg_get_value(REG_ID_RTC_CFG) & RTC_CFG_RUN_ALARM) {
+				if (rtc_run_alarm() != HAL_OK)
+					reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) & (uint8_t)~RTC_CFG_RUN_ALARM);
+			} else {
+				if (rtc_stop_alarm() != HAL_OK)
+					reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) | RTC_CFG_RUN_ALARM);
+			}
+
+			rtc_reg_xor_events &= (uint8_t)~RTC_CFG_RUN_ALARM;
+		}
+	}
+}
+
+__STATIC_INLINE void pwr_ctrl_reg_check(void) {
+	switch (reg_get_value(REG_ID_PWR_CTRL)) {
+	case PWR_CTRL_PICO_RST:
+		reg_set_value(REG_ID_PWR_CTRL, 0);
+		HAL_Delay(200);		// Wait for final I2C answer
+		if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
+			Error_Handler();
+
+		sys_stop_pico();
+		HAL_Delay(200);		// No need to use keyboard, so a simple delay should suffice
+		if (HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
+			if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+				Error_Handler();	//TODO: replace by a I2C reset request
+
+		sys_start_pico();
+		break;
+
+	case PWR_CTRL_FULL_RST:
+		reg_set_value(REG_ID_PWR_CTRL, 0);
+		HAL_Delay(200);		// Wait for final I2C answer
+		if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
+			Error_Handler();
+		sys_stop_pico();
+
+		NVIC_SystemReset();
+		break;
+
+	//case PWR_CTRL_RESERVED:
+	//	break;
+
+	case PWR_CTRL_SLEEP:
+		reg_set_value(REG_ID_PWR_CTRL, 0);
+		sys_stop_pico();
+		AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+
+		stop_mode_active = 1;
+		break;
+
+	case PWR_CTRL_SHUTDOWN:
+		reg_set_value(REG_ID_PWR_CTRL, 0);
+		sys_stop_pico();
+		AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+
+		AXP2101_shutdown();		// Full shudown will rip the RTC configuration! Need to be reset at next reboot.
+		break;
+
+	default:
+		break;
+	}
+}
+
 __STATIC_INLINE void sys_prepare_sleep(void) {
 	LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
 
+	// Put PMIC in low-trigger mode
 	AXP2101_disableIRQ(XPOWERS_AXP2101_ALL_IRQ);
 	AXP2101_clearIrqStatus();
 	AXP2101_enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ |
 					XPOWERS_AXP2101_PKEY_LONG_IRQ |
 					XPOWERS_AXP2101_WARNING_LEVEL1_IRQ
 	);
+
+	// Backlights shut-off
 	lcd_backlight_off();
 	kbd_backlight_off();
 	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_3);
+
+	// Disable I2C slave
+	HAL_I2C_DisableListen_IT(&hi2c1);
+
+	// Front LED switched in low-power mode
 	GPIO_InitStruct.Pin = SYS_LED_Pin;
 	GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
 	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
@@ -756,24 +733,41 @@ __STATIC_INLINE void sys_prepare_sleep(void) {
 __STATIC_INLINE void sys_wake_sleep(void) {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
+	// Restore front LED state
 	GPIO_InitStruct.Pin = SYS_LED_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
 	GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_MEDIUM;
 	HAL_GPIO_Init(SYS_LED_GPIO_Port, &GPIO_InitStruct);
 	LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
-	LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
+
+	// Enable I2C slave
+	if (HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
+		if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+			Error_Handler();	//TODO: replace by a I2C reset request
+
+	// Restart backlights PWM
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 	HAL_Delay(300);
 	kbd_backlight_on();
 	lcd_backlight_on();
+
+	// Re-enable complete IRQ from PMIC
 	AXP2101_enableIRQ(XPOWERS_AXP2101_BAT_INSERT_IRQ |
 					XPOWERS_AXP2101_BAT_REMOVE_IRQ |  // BATTERY
 					XPOWERS_AXP2101_VBUS_INSERT_IRQ |
 					XPOWERS_AXP2101_VBUS_REMOVE_IRQ |  // VBUS
-					XPOWERS_AXP2101_PKEY_SHORT_IRQ |
-					XPOWERS_AXP2101_PKEY_LONG_IRQ |  // POWER KEY
 					XPOWERS_AXP2101_BAT_CHG_DONE_IRQ |
 					XPOWERS_AXP2101_BAT_CHG_START_IRQ  // CHARGE
 	);
+}
+
+__STATIC_INLINE void sys_stop_pico(void) {
+	LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);	// Disable speaker Amp. power
+	LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);		// Disable PICO power
+}
+
+__STATIC_INLINE void sys_start_pico(void) {
+	LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);		// Enable PICO power
+	LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);	// Enable speaker Amp. power
 }
