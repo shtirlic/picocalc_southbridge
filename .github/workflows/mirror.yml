@@ -1,10 +1,10 @@
 name: 'mirror'
 on:
+  schedule:
+    - cron: '0 3 * * *'
   push:
     branches:
         - __mirror
-  schedule:
-    - cron: '* 3 * * *'
   workflow_dispatch:
 
 permissions:
