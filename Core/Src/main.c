@@ -146,7 +146,7 @@ int main(void) {
 
 	// Check EEPROM first run
 	EEPROM_ReadVariable(EEPROM_VAR_ID, (EEPROM_Value*)&result);
-	if ((uint16_t)result != 0xCA1C) {
+	if ((uint16_t)result != 0xCA1C) {	//TODO: replace by CRC
 		EEPROM_WriteVariable(EEPROM_VAR_BCKL, (EEPROM_Value)(uint16_t)((DEFAULT_LCD_BL << 8) | DEFAULT_KBD_BL), EEPROM_SIZE16);
 		EEPROM_WriteVariable(EEPROM_VAR_KBD, (EEPROM_Value)(uint32_t)((DEFAULT_KBD_DEB << 16) | DEFAULT_KBD_FREQ), EEPROM_SIZE32);
 		EEPROM_WriteVariable(EEPROM_VAR_CFG, (EEPROM_Value)(uint16_t)(((CFG_USE_MODS | CFG_REPORT_MODS) << 8) | (INT_OVERFLOW | INT_KEY)), EEPROM_SIZE16);
@@ -158,7 +158,7 @@ int main(void) {
 
 	// Check RTC SRAM first run
 	if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) == 0) {
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0xCA1C);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0xCA1C);	//TODO: replace by CRC
 		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, ((rtc_alarm_time.raw & 0xFF) << 8) | DEFAULT_RCT_CFG);
 		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, rtc_alarm_time.raw >> 16);
 		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, rtc_alarm_date.raw & 0xFFFF);

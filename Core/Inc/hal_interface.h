@@ -127,6 +127,9 @@ extern "C" {
 #define PICO_SDA_Pin LL_GPIO_PIN_9
 #define PICO_SDA_GPIO_Port GPIOB
 
+#define LCD_BCKL_STEPS 10
+#define KBD_BCKL_STEPS 4
+
 
 // Structure definition ---------------------------------------------------------------
 typedef union {

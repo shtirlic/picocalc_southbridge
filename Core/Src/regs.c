@@ -79,8 +79,8 @@ void reg_init(void) {
 	regs[REG_ID_FRQ] = (uint8_t)(buff & 0xFF);
 
 	EEPROM_ReadVariable(EEPROM_VAR_BCKL, (EEPROM_Value*)&buff);
-	regs[REG_ID_BKL] = (uint8_t)((buff >> 8) & 0xFF);
-	regs[REG_ID_BK2] = (uint8_t)(buff & 0xFF);
+	regs[REG_ID_BKL] = (uint8_t)((buff >> 8) & 0xFF) % LCD_BCKL_STEPS;
+	regs[REG_ID_BK2] = (uint8_t)(buff & 0xFF) % KBD_BCKL_STEPS;
 
 	buff = 0;
 	buff |= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);

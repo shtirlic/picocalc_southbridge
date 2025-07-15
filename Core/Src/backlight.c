@@ -9,11 +9,9 @@ extern TIM_HandleTypeDef htim3;
 
 // LCD backlight curve based on brightness measurements for specific value of PWM duty cycle.
 // Using this, I've established a custom command curve.
-#define LCD_BCKL_STEPS 10
+
 //static const uint16_t lcd_bckl_steps[LCD_BCKL_STEPS] = {20, 60, 96, 134, 166, 192, 210, 256, 358, 460};
 static const uint16_t lcd_bckl_steps[LCD_BCKL_STEPS] = {10, 20, 40, 60, 80, 110, 150, 200, 256, 440};
-
-#define KBD_BCKL_STEPS 4
 static const uint16_t kbd_bckl_steps[KBD_BCKL_STEPS] = {0, 40, 110, 260};
 
 
