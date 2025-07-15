@@ -163,11 +163,13 @@ int main(void) {
 	// Check RTC SRAM first run
 	if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) == 0) {
 		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0xCA1C);	//TODO: replace by CRC
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, ((rtc_alarm_time.raw & 0xFF) << 8) | DEFAULT_RCT_CFG);
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, rtc_alarm_time.raw >> 16);
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, rtc_alarm_date.raw & 0xFFFF);
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5, rtc_alarm_date.raw >> 16);
+		// RTC_BKP_DR2/3 - rtc_date will be sync in force_date_bck_sync()
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, ((rtc_alarm_time.raw & 0xFF) << 8) | DEFAULT_RCT_CFG);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5, rtc_alarm_time.raw >> 16);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6, rtc_alarm_date.raw & 0xFFFF);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7, rtc_alarm_date.raw >> 16);
 	}
+	force_date_bck_sync();
 
 	// I2C-Pico interface registers
 	reg_init();
@@ -276,6 +278,7 @@ int main(void) {
 			i2cs_state = I2CS_STATE_IDLE;
 
 		reg_sync();
+		check_date_bck_sync();
 		check_pmu_int();
 		keyboard_process();
 		hw_check_HP_presence();

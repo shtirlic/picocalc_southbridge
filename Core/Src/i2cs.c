@@ -103,6 +103,7 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 						i2cs_RTC_date_from_buffer(&date_s, &i2cs_r_buff[1]);
 
 						HAL_RTC_SetDate(&hrtc, &date_s, RTC_FORMAT_BIN);
+						force_date_bck_sync();
 					}
 
 					HAL_RTC_GetDate(&hrtc, &date_s, RTC_FORMAT_BIN);
