@@ -20,6 +20,7 @@
 #include "hal_interface.h"
 #include "stm32f1xx_hal_flash_ex.h"
 
+CRC_HandleTypeDef hcrc;
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
@@ -29,6 +30,8 @@ RTC_HandleTypeDef hrtc;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+
+WWDG_HandleTypeDef hwwdg;
 
 #ifdef DEBUG
 UART_HandleTypeDef huart1;
@@ -87,6 +90,17 @@ void SystemClock_Config(void) {
 }
 
 /**
+  * @brief CRC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CRC_Init(void) {
+	hcrc.Instance = CRC;
+	if (HAL_CRC_Init(&hcrc) != HAL_OK)
+		Error_Handler();
+}
+
+/**
   * @brief I2C1 Initialization Function
   * @param None
   * @retval None
@@ -122,21 +136,6 @@ static void MX_I2C2_Init(void) {
 	hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
 	if (HAL_I2C_Init(&hi2c2) != HAL_OK)
 		Error_Handler();
-}
-
-/**
-  * @brief IWDG Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_IWDG_Init(void) {
-	LL_IWDG_Enable(IWDG);
-	LL_IWDG_EnableWriteAccess(IWDG);
-	LL_IWDG_SetPrescaler(IWDG, LL_IWDG_PRESCALER_32);
-	LL_IWDG_SetReloadCounter(IWDG, 4095);
-	while (LL_IWDG_IsReady(IWDG) != 1) {}
-
-	LL_IWDG_ReloadCounter(IWDG);
 }
 
 /**
@@ -354,6 +353,23 @@ static void MX_USART3_UART_Init(void) {
 }
 
 /**
+  * @brief WWDG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_WWDG_Init(void) {
+	hwwdg.Instance = WWDG;
+	hwwdg.Init.Prescaler = WWDG_PRESCALER_2;
+	hwwdg.Init.Window = 127;
+	hwwdg.Init.Counter = 127;
+	hwwdg.Init.EWIMode = WWDG_EWI_DISABLE;
+	if (HAL_WWDG_Init(&hwwdg) != HAL_OK)
+		Error_Handler();
+	// Not using it for now
+	__HAL_WWDG_DISABLE();
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -467,6 +483,28 @@ void HAL_MspInit(void) {
 	/** DISABLE: JTAG-DP Disabled and SW-DP Disabled
 	*/
 	__HAL_AFIO_REMAP_SWJ_DISABLE();
+}
+
+/**
+  * @brief CRC MSP Initialization
+  * This function configures the hardware resources used in this example
+  * @param hcrc: CRC handle pointer
+  * @retval None
+  */
+void HAL_CRC_MspInit(CRC_HandleTypeDef* hcrc) {
+	if(hcrc->Instance==CRC)
+		__HAL_RCC_CRC_CLK_ENABLE();
+}
+
+/**
+  * @brief CRC MSP De-Initialization
+  * This function freeze the hardware resources used in this example
+  * @param hcrc: CRC handle pointer
+  * @retval None
+  */
+void HAL_CRC_MspDeInit(CRC_HandleTypeDef* hcrc) {
+	if(hcrc->Instance==CRC)
+		__HAL_RCC_CRC_CLK_DISABLE();
 }
 
 /**
@@ -765,6 +803,17 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* huart) {
 #endif
 }
 
+/**
+  * @brief WWDG MSP Initialization
+  * This function configures the hardware resources used in this example
+  * @param hwwdg: WWDG handle pointer
+  * @retval None
+  */
+void HAL_WWDG_MspInit(WWDG_HandleTypeDef* hwwdg) {
+	if(hwwdg->Instance==WWDG)
+		__HAL_RCC_WWDG_CLK_ENABLE();
+}
+
 
 /**
   * @brief  This function is executed in case of error occurrence.
@@ -834,6 +883,7 @@ HAL_StatusTypeDef HAL_Interface_init(void) {
 	// Use SRAM backup registers to check if we have soft-reset
 	HAL_PWR_EnableBkUpAccess();
 
+	MX_CRC_Init();
 	MX_GPIO_Init();
 	MX_I2C1_Init();
 	MX_I2C2_Init();
@@ -843,9 +893,9 @@ HAL_StatusTypeDef HAL_Interface_init(void) {
 		MX_RTC_Init();
 	MX_USART1_UART_Init();
 	MX_USART3_UART_Init();
-//#ifndef DEBUG
-//	MX_IWDG_Init();
-//#endif
+#ifndef DEBUG
+	MX_WWDG_Init();
+#endif
 	MX_TIM1_Init();
 	MX_TIM3_Init();
 	MX_TIM2_Init();

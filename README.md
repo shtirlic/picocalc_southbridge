@@ -9,7 +9,7 @@ The main differences with the original firmware are the followings:
 - drastic reduction in the STM32's electricity consumption when running (~3.5 mA),
 - clean up (by removing stm32duino dependencies, use STM32HAL instead, maybe I'll switch to libopencm3 someday...) to reduce binary size (~25 KB) and allow more features to be implemented,
 - added configuration saving solution (using internal flash, including backlight option),
-- new I2C registers memory allocation and structure (keeping compatible access to REG_ID_TYP and REG_ID_VER registers to check how to handle comm from pico board side)(WIP),
+- new I2C registers memory allocation and structure for cleaner evolution in feature (pico I2C driver updated to handle this version along with official)(WIP),
 - interrupt event output to pico board can be configured during runtime (for keyboard event or RTC alarm),
 - rewriten or added some debug UART interface message (only when compiled in DEBUG release type),
 - internal RTC access through dedicated I2C registers,
@@ -26,7 +26,6 @@ If you plan using pico official firmware (PicoMite, etc.), you should set I2C_RE
 
 ## TODO
 - Registers memory structure/allocation rewrite
-- Auto wake-up
 - IRQ to Pico management (register exist but does nothing)
 - Add a Pico test program for registers/features implemented
 - add few wiki page to detail the I2C protocol, added features, etc.

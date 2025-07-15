@@ -52,6 +52,8 @@
 
 
 // Private variables ---------------------------------------------------------
+extern CRC_HandleTypeDef hcrc;
+
 extern I2C_HandleTypeDef hi2c1;
 extern I2C_HandleTypeDef hi2c2;
 
@@ -60,6 +62,8 @@ extern RTC_HandleTypeDef hrtc;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
+
+extern WWDG_HandleTypeDef hwwdg;
 
 #ifdef DEBUG
 extern UART_HandleTypeDef huart1;
@@ -259,10 +263,13 @@ int main(void) {
 	sync_bat();
 	low_bat();
 
+#ifndef DEBUG
+	__HAL_WWDG_ENABLE();
+#endif
 	while (1) {
-//#ifndef DEBUG
-//		LL_IWDG_ReloadCounter(IWDG);
-//#endif
+#ifndef DEBUG
+		HAL_WWDG_Refresh(&hwwdg);
+#endif
 
 		// Re-arm I2CS in case of lost master signal
 		if (i2cs_state != I2CS_STATE_IDLE && ((uptime_ms() - i2cs_rearm_counter) > I2CS_REARM_TIMEOUT))
@@ -282,7 +289,9 @@ int main(void) {
 			sys_prepare_sleep();
 
 			/* Low-power mode entry */
-			//HAL_WWDG_Disable();
+#ifndef DEBUG
+			__HAL_WWDG_DISABLE();
+#endif
 			HAL_SuspendTick();
 			HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
 			SystemClock_Config();
@@ -290,6 +299,9 @@ int main(void) {
 			HAL_Delay(300);
 
 			/* Wake-up peripherals from low-power mode */
+#ifndef DEBUG
+			__HAL_WWDG_ENABLE();
+#endif
 			sys_wake_sleep();
 			sys_start_pico();
 		}

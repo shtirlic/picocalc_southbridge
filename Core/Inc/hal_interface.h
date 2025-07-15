@@ -18,16 +18,17 @@
   */
 
 #include "stm32f1xx_hal.h"
-#include "stm32f1xx_ll_iwdg.h"
 #include "stm32f1xx_ll_rcc.h"
 #include "stm32f1xx_ll_bus.h"
 #include "stm32f1xx_ll_system.h"
 #include "stm32f1xx_ll_exti.h"
 #include "stm32f1xx_ll_cortex.h"
+#include "stm32f1xx_ll_crc.h"
 #include "stm32f1xx_ll_utils.h"
 #include "stm32f1xx_ll_pwr.h"
 #include "stm32f1xx_ll_dma.h"
 #include "stm32f1xx_ll_gpio.h"
+#include "stm32f1xx_ll_wwdg.h"
 
 
 #ifndef HAL_INTERFACE_H_
@@ -129,6 +130,17 @@ extern "C" {
 
 #define LCD_BCKL_STEPS 10
 #define KBD_BCKL_STEPS 4
+
+
+#ifdef __HAL_WWDG_ENABLE
+#undef __HAL_WWDG_ENABLE
+#endif
+#define __HAL_WWDG_ENABLE()	__HAL_RCC_WWDG_CLK_ENABLE()
+
+#ifdef __HAL_WWDG_DISABLE
+#undef __HAL_WWDG_DISABLE
+#endif
+#define __HAL_WWDG_DISABLE()	__HAL_RCC_WWDG_CLK_DISABLE()
 
 
 // Structure definition ---------------------------------------------------------------
