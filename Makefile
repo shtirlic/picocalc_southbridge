@@ -192,7 +192,7 @@ $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR)
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
 $(BUILD_DIR)/%.s: %.c Makefile | $(BUILD_DIR) 
-	$(CC) $(CFLAGS_ASM) -fverbose-asm -S $< -o $@
+	@$(CC) $(CFLAGS_ASM) -w -fverbose-asm -S $< -o $@
 
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
 	$(AS) -c $(CFLAGS) $< -o $@
