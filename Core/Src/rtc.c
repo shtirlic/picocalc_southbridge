@@ -13,6 +13,9 @@ extern void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc) {
 	RTC_DateTypeDef date_s = {0};
 	uint8_t date_valid = 1;
 
+	// Needed to fetch the good date from wake-up
+	force_rtc_bck_load();
+
 	if ((rtc_conf & RTC_CFG_DATE_ALARM) == RTC_CFG_DATE_ALARM) {
 		HAL_RTC_GetDate(hrtc, &date_s, RTC_FORMAT_BIN);
 		if (date_s.Year != rtc_alarm_date._s.Year ||
@@ -30,27 +33,63 @@ extern void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc) {
 	}
 }
 
-void force_date_bck_sync(void) {
-	// STM32F1 RTC doesn't memorize date, need to keep it in sync in SRAM
-	RTC_DateTypeDef_u bckDate;
-	RTC_DateTypeDef_u coreDate;
-	bckDate.raw = (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2) & 0xFFFF) | (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR3) << 16);
+static uint32_t date_is_anterior(RTC_DateTypeDef* d1, RTC_DateTypeDef* d2) {
+	if (d1->Year < d2->Year)
+		return 1;
+	if (d1->Year > d2->Year)
+		return 0;
 
+	if (d1->Month < d2->Month)
+		return 1;
+	if (d1->Month > d2->Month)
+		return 0;
+
+	if (d1->Date < d2->Date)
+		return 1;
+
+	return 0;
+}
+
+// STM32F1 RTC is really basic and don't remember calendar!
+// At wake-up from any low-power mode, we need to call this method before
+// any HAL_RTC_GetDate or HAL_RTC_GetTime functions. This is mandatory
+// to compute the right date.
+void force_rtc_bck_load(void) {
+	RTC_DateTypeDef_u bckDate;
+	bckDate.raw = (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR6) & 0xFFFF) | (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR7) << 16);
+
+	if (IS_RTC_YEAR(bckDate._s.Year) &&	IS_RTC_MONTH(bckDate._s.Month) && IS_RTC_DATE(bckDate._s.Date) && bckDate._s.WeekDay < 7) {
+		hrtc.DateToUpdate.Year = bckDate._s.Year;
+		hrtc.DateToUpdate.Month = bckDate._s.Month;
+		hrtc.DateToUpdate.Date = bckDate._s.Date;
+		hrtc.DateToUpdate.WeekDay = bckDate._s.WeekDay;
+	}
+}
+
+void force_rtc_bck_sync(void) {
+	RTC_DateTypeDef_u bckDate, coreDate;
+	bckDate.raw = (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR6) & 0xFFFF) | (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR7) << 16);
+
+	// Caution! This function increment the day of the date depending of timer counter.
 	HAL_RTC_GetDate(&hrtc, &coreDate._s, RTC_FORMAT_BIN);
-	if ((coreDate.raw & 0xFFFFFF00) == 0) {			// RTC is in reset condition, load from SRAM
+	// RTC is in un-sync condition (date anterior to one in SRAM), load from SRAM
+	if (date_is_anterior(&coreDate._s, &bckDate._s)) {
 		HAL_RTC_SetDate(&hrtc, &bckDate._s, RTC_FORMAT_BIN);
-	} else if (coreDate.raw != bckDate.raw) {		// RTC is good but SRAM aren't sync, store to SRAM
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, coreDate.raw & 0xFFFF);
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, coreDate.raw >> 16);
+	}
+	// Nominal condition
+	else if (coreDate.raw != bckDate.raw) {
+		// Sync
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6, coreDate.raw & 0xFFFF);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7, coreDate.raw >> 16);
 	}
 
 	date_sync_counter = uptime_ms();
 }
 
-void check_date_bck_sync(void) {
+void check_rtc_bck_sync(void) {
 	// sync check every 1m
 	if (uptime_ms() - date_sync_counter > 60000)
-		force_date_bck_sync();
+		force_rtc_bck_sync();
 }
 
 void i2cs_fill_buffer_RTC_date(uint8_t* const date_buff, const volatile RTC_DateTypeDef* const date_s) {

@@ -4,8 +4,9 @@
 #ifndef RTC_H_
 #define RTC_H_
 
-void force_date_bck_sync(void);
-void check_date_bck_sync(void);
+void force_rtc_bck_load(void);
+void force_rtc_bck_sync(void);
+void check_rtc_bck_sync(void);
 void i2cs_fill_buffer_RTC_date(uint8_t* const buff, const volatile RTC_DateTypeDef* const date_s);
 void i2cs_fill_buffer_RTC_time(uint8_t* const buff, const volatile RTC_TimeTypeDef* const time_s);
 void i2cs_RTC_date_from_buffer(volatile RTC_DateTypeDef* const date_s, const uint8_t* const buff);

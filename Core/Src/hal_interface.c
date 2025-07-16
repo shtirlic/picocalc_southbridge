@@ -179,12 +179,23 @@ static void MX_RTC_Init(void) {
   * @retval None
   */
 static void MX_RTC_Init2(void) {
+	RTC_DateTypeDef DateToUpdate = {0};
+
 	hrtc.Instance = RTC;
 	hrtc.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
 	hrtc.Init.OutPut = RTC_OUTPUTSOURCE_NONE;
+
 	hrtc.Lock = HAL_UNLOCKED;
 	HAL_RTC_MspInit(&hrtc);
 	hrtc.State = HAL_RTC_STATE_READY;
+
+	DateToUpdate.WeekDay = RTC_WEEKDAY_MONDAY;
+	DateToUpdate.Month = RTC_MONTH_JANUARY;
+	DateToUpdate.Date = 0x1;
+	DateToUpdate.Year = 0x0;
+
+	if (HAL_RTC_SetDate(&hrtc, &DateToUpdate, RTC_FORMAT_BCD) != HAL_OK)
+		Error_Handler();
 }
 
 /**

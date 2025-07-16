@@ -162,14 +162,15 @@ int main(void) {
 
 	// Check RTC SRAM first run
 	if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) == 0) {
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0xCA1C);	//TODO: replace by CRC
-		// RTC_BKP_DR2/3 - rtc_date will be sync in force_date_bck_sync()
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0xCA1C);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, rtc_alarm_date.raw & 0xFFFF);
+		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, rtc_alarm_date.raw >> 16);
 		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, ((rtc_alarm_time.raw & 0xFF) << 8) | DEFAULT_RCT_CFG);
 		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5, rtc_alarm_time.raw >> 16);
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6, rtc_alarm_date.raw & 0xFFFF);
-		HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7, rtc_alarm_date.raw >> 16);
+		// RTC_BKP_DR6/7 - rtc_date will be sync in force_date_bck_sync()
 	}
-	force_date_bck_sync();
+	force_rtc_bck_load();
+	force_rtc_bck_sync();
 
 	// I2C-Pico interface registers
 	reg_init();
@@ -278,7 +279,7 @@ int main(void) {
 			i2cs_state = I2CS_STATE_IDLE;
 
 		reg_sync();
-		check_date_bck_sync();
+		check_rtc_bck_sync();
 		check_pmu_int();
 		keyboard_process();
 		hw_check_HP_presence();
@@ -287,11 +288,12 @@ int main(void) {
 
 		// Execute stop/sleep mode if requested
 		if (stop_mode_active == 1) {
-			/* Prepare peripherals to the low-power mode */
+			// Prepare peripherals to the low-power mode
+			force_rtc_bck_sync();
 			sys_stop_pico();
 			sys_prepare_sleep();
 
-			/* Low-power mode entry */
+			// Low-power mode entry
 #ifndef DEBUG
 			__HAL_WWDG_DISABLE();
 #endif
@@ -301,11 +303,14 @@ int main(void) {
 			HAL_ResumeTick();
 			HAL_Delay(300);
 
-			/* Wake-up peripherals from low-power mode */
+			// Wake-up peripherals from low-power mode
 #ifndef DEBUG
+			HAL_WWDG_Refresh(&hwwdg);
 			__HAL_WWDG_ENABLE();
 #endif
 			sys_wake_sleep();
+			force_rtc_bck_load();
+			force_rtc_bck_sync();
 			sys_start_pico();
 		}
 	}
