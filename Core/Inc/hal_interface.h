@@ -168,6 +168,7 @@ extern volatile RTC_DateTypeDef_u rtc_alarm_date;
 // Global functions definition --------------------------------------------------------
 void SystemClock_Config(void);
 HAL_StatusTypeDef HAL_Interface_init(void);
+void HAL_Interface_I2C1_reset(void);
 
 __STATIC_INLINE uint32_t uptime_ms(void) { return systicks_counter; }
 void flash_one_time(uint32_t ts, uint8_t restore_status);

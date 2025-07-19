@@ -7,7 +7,7 @@
 enum reg_id {
 	REG_ID_TYP = 0x00,			//!< firmware type (0=official, others=custom)
 	REG_ID_VER = 0x01,			//!< fw version (7:4=Major, 3:0=Minor)
-#ifdef I2C_REGS_COMPAT
+
 	REG_ID_SYS_CFG = 0x02, // config
 	REG_ID_INT = 0x03, // interrupt status
 	REG_ID_KEY = 0x04, // key status
@@ -26,45 +26,7 @@ enum reg_id {
 	REG_ID_RTC_TIME = 0x11, // RTC time
 	REG_ID_RTC_ALARM_DATE = 0x12, // RTC alarm date
 	REG_ID_RTC_ALARM_TIME = 0x13, // RTC alarm time
-#else
-	// TODO: REG_ID_CFG_0 - 32b (RW)
-	REG_ID_SYS_CFG = 0x02,			//!< config
-	REG_ID_INT_CFG = 0x03,			//!< IRQ config
-	REG_ID_PWR_CTRL = 0x04,			//!< Power control (0: idle, 1: pico reset, 2: system reset, 3: reserved, 4: sleep, 5: full-shutdown)
-	REG_ID_RTC_CFG = 0x05,			//!< RTC general config
 
-	// TODO: REG_ID_CFG_1 - 32b (RW)
-	REG_ID_DEB = 0x06,				//!< debounce cfg (time in ms)
-	REG_ID_FRQ = 0x07,				//!< poll freq cfg (time in ms)
-	REG_ID_BKL = 0x08,				//!< backlight steps (0-9)
-	REG_ID_BK2 = 0x09,				//!< keyboard backlight (0-9)
-
-	// TODO: REG_ID_RTC_DATE - 32b (RW)
-	REG_ID_RTC_DATE = 0x0A,			//!< RTC date
-	// TODO: REG_ID_RTC_TIME - 32b (RW)
-	REG_ID_RTC_TIME = 0x0B,			//!< RTC time
-	// TODO: REG_ID_RTC_ALARM_DATE - 32b (RW)
-	REG_ID_RTC_ALARM_DATE = 0x0C,	//!< RTC alarm date
-	// TODO: REG_ID_RTC_ALARM_TIME - 32b (RW)
-	REG_ID_RTC_ALARM_TIME = 0x0D,	//!< RTC alarm time
-
-	// TODO: REG_ID_INT - 32b (RO)
-	REG_ID_INT = 0x10,				//!< interrupt flags status
-
-	// TODO: REG_ID_KBD - 32b (RO)
-	REG_ID_KEY = 0x14,				//!< key status - 8b
-	REG_ID_C64_JS = 0x15,			//!< joystick io bits - 8b
-	REG_ID_FIF = 0x16,				//!< fifo - 16b
-
-	// TODO: REG_ID_BAT - 32b (RO)
-	REG_ID_BAT = 0x18,				//!< battery percentage - 16b
-	//REG_ID_BAT_RAW				//!< battery voltage value in mV - 16b
-
-	// TODO: REG_ID_C64_MTX_0 - 32b (RO)
-	REG_ID_C64_MTX = 0x1A,			//!< read c64 matrix
-	// TODO: REG_ID_C64_MTX_1 - 32b (RO)
-	// TODO: REG_ID_C64_MTX_2 - 32b (RO)
-#endif
 	REG_ID_LAST
 };
 

@@ -928,3 +928,11 @@ HAL_StatusTypeDef HAL_Interface_init(void) {
 
 	return result;
 }
+
+void HAL_Interface_I2C1_reset(void) {
+	HAL_I2C_MspDeInit(&hi2c1);
+	if (HAL_I2C_DeInit(&hi2c1) != HAL_OK)
+		Error_Handler();
+
+	MX_I2C1_Init();
+}

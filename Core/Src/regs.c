@@ -3,6 +3,7 @@
 #include "hal_interface.h"
 #include "stm32f1xx_hal_rtc_ex.h"
 #include "eeprom.h"
+#include "keyboard.h"
 #include "version.h"
 
 
@@ -92,8 +93,6 @@ void reg_init(void) {
 	buff |= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR4);
 	buff |= HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR5) << 16;
 	rtc_alarm_date.raw = buff;
-
-	regs[REG_ID_BAT] = 0; //default .no battery ,no charging
 
 	regs[REG_ID_TYP] = 0xCA;	// That's me :3
 

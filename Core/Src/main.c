@@ -52,8 +52,6 @@
 
 
 // Private variables ---------------------------------------------------------
-extern CRC_HandleTypeDef hcrc;
-
 extern I2C_HandleTypeDef hi2c1;
 extern I2C_HandleTypeDef hi2c2;
 
@@ -150,7 +148,7 @@ int main(void) {
 
 	// Check EEPROM first run
 	EEPROM_ReadVariable(EEPROM_VAR_ID, (EEPROM_Value*)&result);
-	if ((uint16_t)result != 0xCA1C) {	//TODO: replace by CRC
+	if ((uint16_t)result != 0xCA1C) {
 		EEPROM_WriteVariable(EEPROM_VAR_BCKL, (EEPROM_Value)(uint16_t)((DEFAULT_LCD_BL << 8) | DEFAULT_KBD_BL), EEPROM_SIZE16);
 		EEPROM_WriteVariable(EEPROM_VAR_KBD, (EEPROM_Value)(uint32_t)((DEFAULT_KBD_DEB << 16) | DEFAULT_KBD_FREQ), EEPROM_SIZE32);
 		EEPROM_WriteVariable(EEPROM_VAR_CFG, (EEPROM_Value)(uint16_t)(((CFG_USE_MODS | CFG_REPORT_MODS) << 8) | (INT_OVERFLOW | INT_KEY)), EEPROM_SIZE16);
@@ -682,7 +680,7 @@ __STATIC_INLINE void pwr_ctrl_reg_check(void) {
 		HAL_Delay(200);		// No need to use keyboard, so a simple delay should suffice
 		if (HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
 			if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
-				Error_Handler();	//TODO: replace by a I2C reset request
+				HAL_Interface_I2C1_reset();
 
 		sys_start_pico();
 		break;
@@ -763,7 +761,7 @@ __STATIC_INLINE void sys_wake_sleep(void) {
 	// Enable I2C slave
 	if (HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
 		if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
-			Error_Handler();	//TODO: replace by a I2C reset request
+			HAL_Interface_I2C1_reset();
 
 	// Restart backlights PWM
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);

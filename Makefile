@@ -2,6 +2,8 @@
 # Generic Makefile (based on gcc)
 #
 # ChangeLog :
+#   2025-07-19 - Removed I2C_REGS_COMPAT option
+#   2025-07-12 - Windows mkdir/rmdir tweaks
 #   2025-05-09 - Added I2C_REGS_COMPAT option
 #   2025-04-25 - Tuned for PicoCalc firmware project
 #   2017-02-10 - Several enhancements + project update mode
@@ -21,9 +23,8 @@ TARGET = picocalc_BIOS_jcs
 DEBUG = 0
 # optimization
 OPT = -O3
-# use old I2C registers structure
-I2C_REGS_COMPAT = 0
-
+# custom specs
+#SPECS = picolibc.specs
 
 #######################################
 # paths
@@ -146,11 +147,12 @@ C_INCLUDES =  \
 -IDrivers/CMSIS_Device_ST_STM32F1xx/Include \
 -IDrivers/CMSIS/Include
 
+SPECS ?= nano.specs
 
 # compile gcc flags
-ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -std=gnu17 -Wall -Wextra -fdata-sections -ffunction-sections --specs=nano.specs
+ASFLAGS = $(MCU) $(AS_DEFS) $(AS_INCLUDES) $(OPT) -std=gnu17 -Wall -Wextra -fdata-sections -ffunction-sections --specs=$(SPECS)
 
-CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -std=gnu17 -Wall -Wextra -pedantic -Wconversion -fdata-sections -ffunction-sections --specs=nano.specs
+CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -std=gnu17 -Wall -Wextra -pedantic -Wconversion -fdata-sections -ffunction-sections --specs=$(SPECS)
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
@@ -171,7 +173,7 @@ LDSCRIPT = STM32F103XX_FLASH.ld
 # libraries
 LIBS = 
 LIBDIR = 
-LDFLAGS = $(MCU) --specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections -static
+LDFLAGS = $(MCU) --specs=$(SPECS) -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections -static
 
 # default action: build all
 all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
@@ -180,6 +182,13 @@ all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET
 #######################################
 # build the application
 #######################################
+# Verbose flag
+ifeq ($(VERBOSE),1)
+V		:=
+else
+V		:= @
+endif
+
 # list of objects
 OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 OBJECTS_ASM = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.s)))
@@ -191,19 +200,22 @@ OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASMM_SOURCES:.S=.o)))
 vpath %.S $(sort $(dir $(ASMM_SOURCES)))
 
 $(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
-	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
+	@echo "  CC    $<"
+	$(V)$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
 $(BUILD_DIR)/%.s: %.c Makefile | $(BUILD_DIR) 
 	@$(CC) $(CFLAGS_ASM) -w -fverbose-asm -S $< -o $@
 
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
-	$(AS) -c $(CFLAGS) $< -o $@
+	@echo "  AS    $<"
+	$(V)$(AS) -c $(CFLAGS) $< -o $@
 $(BUILD_DIR)/%.o: %.S Makefile | $(BUILD_DIR)
-	$(AS) -c $(CFLAGS) $< -o $@
+	$(V)$(AS) -c $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) $(OBJECTS_ASM) Makefile
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
-	$(SZ) $@
+	@echo "  LD    $<"
+	$(V)$(CC) $(OBJECTS) $(LDFLAGS) -o $@
+	$(V)$(SZ) $@
 
 $(BUILD_DIR)/%.hex: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(HEX) $< $@
@@ -212,13 +224,14 @@ $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(BIN) $< $@	
 	
 $(BUILD_DIR):
-	mkdir $@		
+	mkdir -p "$@"
 
 #######################################
 # clean up
 #######################################
 clean:
-	-rm -fR $(BUILD_DIR)
+	@echo "  CLEAN"
+	rm -rf "$(BUILD_DIR)"
   
 #######################################
 # dependencies

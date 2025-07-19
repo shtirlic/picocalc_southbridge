@@ -34,7 +34,12 @@ inline void lcd_backlight_update(uint8_t step) {
 	uint16_t val = 0;
 	const uint8_t index = step % LCD_BCKL_STEPS;
 
-	val = lcd_bckl_steps[index];
+	// In case the user ask for a 0-255 range (like in the official driver), convert to the 9-bit (0-511) range
+	if (step >= LCD_BCKL_STEPS)
+		val = (uint16_t)((step - lcd_bckl_steps[0]) * 511 / 255) % 512;
+	else
+		val = lcd_bckl_steps[index];
+
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, val);
 
 	reg_set_value(REG_ID_BKL, index);
@@ -78,7 +83,12 @@ inline void kbd_backlight_update(uint8_t step) {
 	uint16_t val = 0;
 	const uint8_t index = step % KBD_BCKL_STEPS;
 
-	val = kbd_bckl_steps[index];
+	// In case the user ask for a 0-255 range (like in the official driver), convert to the 9-bit (0-511) range
+	if (step >= KBD_BCKL_STEPS)
+			val = (uint16_t)((step - kbd_bckl_steps[0]) * 511 / 255) % 512;
+		else
+			val = kbd_bckl_steps[index];
+
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, val);
 
 	reg_set_value(REG_ID_BK2, index);
