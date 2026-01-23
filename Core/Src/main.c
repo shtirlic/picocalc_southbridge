@@ -236,8 +236,8 @@ int main(void) {
 					XPOWERS_AXP2101_WARNING_LEVEL1_IRQ |
 					XPOWERS_AXP2101_VBUS_INSERT_IRQ |
 					XPOWERS_AXP2101_VBUS_REMOVE_IRQ |  // VBUS
-					XPOWERS_AXP2101_PKEY_SHORT_IRQ |
-					XPOWERS_AXP2101_PKEY_LONG_IRQ |  // POWER KEY
+					//XPOWERS_AXP2101_PKEY_SHORT_IRQ |
+					//XPOWERS_AXP2101_PKEY_LONG_IRQ |  // POWER KEY - inhibit for startup
 					XPOWERS_AXP2101_BAT_CHG_DONE_IRQ |
 					XPOWERS_AXP2101_BAT_CHG_START_IRQ  // CHARGE
 	);
@@ -316,6 +316,10 @@ int main(void) {
 				sys_wake_sleep();
 				force_rtc_bck_load();
 				force_rtc_bck_sync();
+				// Keyboard reset for detecting boot key press
+				fifo_flush();
+				keyboard_reset();
+				keyboard_process();
 				sys_start_pico();
 			}
 		}
@@ -502,10 +506,18 @@ __STATIC_INLINE void check_pmu_int(void) {
 	if (!pmu_online)
 		return;
 
+	static uint8_t uninhibit_pwr_button = 0;
 	uint8_t pcnt;
 
-	if (uptime_ms() - pmu_check_counter > 20000) {
+	if (uptime_ms() - pmu_check_counter > 2000) {
 		pmu_check_counter = uptime_ms();  // reset time
+
+		// Remove start-up inhibit on
+		if (uninhibit_pwr_button == 0) {
+			AXP2101_enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ);
+			uninhibit_pwr_button = 1;
+		}
+
 		AXP2101_getBatteryPercent(&pcnt);
 #ifdef DEBUG
 		DEBUG_UART_MSG("check_pmu_int: ");
@@ -689,6 +701,8 @@ __STATIC_INLINE void rst_ctrl_reg_check(void) {
     if (rst_reg == 0)
     	return;
 
+    AXP2101_disableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ);
+
     HAL_Delay(300);		// Wait for final I2C answer
 	if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
 		Error_Handler();
@@ -714,6 +728,7 @@ __STATIC_INLINE void rst_ctrl_reg_check(void) {
 		if (HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
 			if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
 				HAL_Interface_I2C1_reset();
+		AXP2101_enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ);
 
 		sys_start_pico();
 	} else if (rst_reg == RST_CTRL_FULL_RST) {

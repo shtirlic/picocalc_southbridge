@@ -18,10 +18,10 @@ This include:
 
 ## Tools version
 
-- ARM GNU GCC: 14.3-rel1_arm-none-eabi
+- ARM GNU GCC: 14.3-rel1_arm-none-eabi (but STM32 one can do the job too)
 
 ## Compile
-This source code can be compiled using ARM gcc toolchain in path and using make program.
+This source code can be compiled using ARM/STM32 gcc toolchain in path and using make program.
 
 ```
 git clone --recurse-submodules https://git.jcsmith.fr/jackcartersmith/picocalc_BIOS.git
@@ -40,15 +40,7 @@ make -j
 7. Power reset everything like step 1.
 
 ## TODO
-- Add a Pico test program for registers/features implemented
-
-## Important notes
-The current implementation of this firmware is subject to change until the v1 release.
-
-Some features can be unstable or buggy and are marked as pre-release. A test program will be developped soon to provide some regression testing.
-
-The permanent settings (EEPROM) save can be broken between 0.x version, it is recommanded to make a full flash erase before updating, as 
-EEPROM configuration survives update.
+- Review the I2C slave... Can be better.
 
 ## Credits
 - STM32-HAL: [link](https://github.com/STMicroelectronics/stm32f1xx-hal-driver)
