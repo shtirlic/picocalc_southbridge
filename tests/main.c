@@ -147,7 +147,7 @@ static void RTC_disp(PCSB_RTC_DATE_STRUCT* const rtc_date, PCSB_RTC_TIME_STRUCT*
     if (result == 0)
         lcd_printf_string("RTC check: %s %02d/%02d/%04d", &dayOfWeekLUT[rtc_date->dayOfWeek-1], rtc_date->day, rtc_date->month, 2000 + rtc_date->year);
     else {
-        lcd_print_string("SB-RTC>-[NOK]> Failed to read date register!\n");
+        lcd_print_string("SB-RTC>-[NOK]> R-REG-DATE!\n");
         lcd_printf_string("RAW: %08X\n", rtc_date->raw);
     }
 
@@ -155,7 +155,7 @@ static void RTC_disp(PCSB_RTC_DATE_STRUCT* const rtc_date, PCSB_RTC_TIME_STRUCT*
     if (result == 0)
         lcd_printf_string(" - %02d:%02d:%02d\n", rtc_time->hours, rtc_time->minutes, rtc_time->secondes);
     else {
-        lcd_print_string("SB-RTC>-[NOK]> Failed to read time register!\n");
+        lcd_print_string("\nSB-RTC>-[NOK]> R-REG-TIME!\n");
         lcd_printf_string("RAW: %08X\n", rtc_time->raw);
     }
 }
@@ -188,14 +188,14 @@ int main() {
 	
 	ret_state = lcd_init();
 	lcd_clear();
-	lcd_print_string("If you can read this...\nYou are going to debug all the night!\n\n");
+	lcd_print_string("If you can read this...\nYou should make more coffee!\n\n");
     lcd_printf_string("> SB-I2C speed: %d KHz\n", pcsb_get_i2c_speed() / 1000);
     lcd_printf_string("> LCD-SPI speed: %d KHz\n", ret_state / 1000);
 	
 	if (pcsb_state == 2)
-		lcd_print_string("SB-CORE>-[NOK]> ID register missmatch!\n");
+		lcd_print_string("SB-CORE>-[NOK]> MM-REG-ID!\n");   // MissMatch
 	else if (pcsb_state == 1)
-		lcd_print_string("SB-CORE>-[NOK]> Failed to read ID register!\n");
+		lcd_print_string("SB-CORE>-[NOK]> R-REG-ID!\n");
 	else
 		lcd_print_string("SB-CORE>-[OK]-\n");
 
@@ -211,12 +211,12 @@ int main() {
 		rtc_date.month = 05;
 		rtc_date.year = 25;
 		if (pcsb_rtc_set_date(&rtc_date) == -2)
-			lcd_print_string("SB-RTC>-[NOK]> Can't set RTC date\n");
+			lcd_print_string("SB-RTC>-[NOK]> W-REG-DATE\n");
 		else {
             rtc_time.hours = 23;
             rtc_time.minutes = 59;
             if (pcsb_rtc_set_time(&rtc_time) == -2)
-                lcd_print_string("SB-RTC>-[NOK]> Can't set RTC time\n");
+                lcd_print_string("SB-RTC>-[NOK]> W-REG-TIME\n");
             else {
                 lcd_print_string("SB-RTC>-[OK]> RTC reconfigured\n");
 
@@ -238,13 +238,17 @@ int main() {
         if (c == 0xB1)  // ESC
             break;
 
-		if(c != -1 && c > 0) {
-			lcd_printf_string("SB-KBD> 0x%02X\n", c);
-		} else if (c == -2) {
+        if (c == -12 || c == -11) {
             if (i2c_err_cnt <= 7) {
-			    lcd_printf_string("KBD FIFO read failure! 0x%02X\n", c);
+			    lcd_printf_string("KBD FIFO read failure! (%d)\n", c);
                 ++i2c_err_cnt;
             }
+		} else if(c != -1 && c > 0) {
+            if (i2c_err_cnt > 7) {
+                lcd_printf_string("SB-KBD> link restored.\n", c);
+                i2c_err_cnt = 0;
+            }
+			lcd_printf_string("SB-KBD> 0x%02X\n", c);
 		}
 		sleep_ms(20);
     }

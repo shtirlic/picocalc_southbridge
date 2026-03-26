@@ -12,8 +12,9 @@ int pcsb_kbd_read_c() {
     if (pcsb_is_init() == 0) return -1;
 	msg[0] = pcsb_get_addr_table()->reg_fif;
 
-    if (_int_i2c_op(msg, 1, (uint8_t*)&buff, 2) != 0)
-        return -2;
+    c = _int_i2c_op(msg, 1, (uint8_t*)&buff, 2);
+    if (c != 0)
+        return c - 10;
 
     if (buff != 0) {
         if (buff == 0x7e03)
