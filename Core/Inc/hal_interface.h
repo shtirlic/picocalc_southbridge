@@ -149,8 +149,8 @@ extern volatile uint32_t systicks_counter;
 extern volatile uint8_t pmu_irq;
 
 extern volatile uint8_t rtc_reg_xor_events;
-extern volatile RTC_TimeTypeDef_u rtc_alarm_time;
-extern volatile RTC_DateTypeDef_u rtc_alarm_date;
+extern volatile RTC_TimeTypeDef_u rtc_time, rtc_alarm_time;
+extern volatile RTC_DateTypeDef_u rtc_date, rtc_alarm_date;
 
 
 // Global functions definition --------------------------------------------------------

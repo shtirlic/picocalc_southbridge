@@ -40,7 +40,8 @@ make -j
 7. Power reset everything like step 1.
 
 ## TODO
-- Review the I2C slave... Can be better.
+
+*Look at the issues tab to have a look into the next WIP step.*
 
 ## Credits
 - STM32-HAL: [link](https://github.com/STMicroelectronics/stm32f1xx-hal-driver)

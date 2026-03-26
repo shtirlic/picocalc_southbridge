@@ -41,8 +41,8 @@ UART_HandleTypeDef huart3;
 #endif
 
 volatile uint8_t rtc_reg_xor_events = 0;
-volatile RTC_TimeTypeDef_u rtc_alarm_time = {.raw = 0x00000000};
-volatile RTC_DateTypeDef_u rtc_alarm_date = {.raw = 0x00010101};
+volatile RTC_TimeTypeDef_u rtc_time = {.raw = 0x00000000}, rtc_alarm_time = {.raw = 0x00000000};
+volatile RTC_DateTypeDef_u rtc_date = {.raw = 0x00010101}, rtc_alarm_date = {.raw = 0x00010101};
 
 static volatile uint8_t led_blink_remaining = 0;
 static volatile uint32_t led_blink_counter = 0;
@@ -531,9 +531,9 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* hi2c) {
 		__HAL_RCC_I2C1_CLK_ENABLE();
 
 		/* I2C1 interrupt Init */
-		HAL_NVIC_SetPriority(I2C1_EV_IRQn, 2, 0);
+		HAL_NVIC_SetPriority(I2C1_EV_IRQn, 1, 0);
 		HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);
-		HAL_NVIC_SetPriority(I2C1_ER_IRQn, 2, 0);
+		HAL_NVIC_SetPriority(I2C1_ER_IRQn, 1, 0);
 		HAL_NVIC_EnableIRQ(I2C1_ER_IRQn);
 	} else if (hi2c->Instance == I2C2) {
 		__HAL_RCC_GPIOB_CLK_ENABLE();
@@ -929,9 +929,9 @@ HAL_StatusTypeDef HAL_Interface_init(void) {
 }
 
 void HAL_Interface_I2C1_reset(void) {
-	HAL_I2C_MspDeInit(&hi2c1);
-	if (HAL_I2C_DeInit(&hi2c1) != HAL_OK)
-		Error_Handler();
-
-	MX_I2C1_Init();
+	HAL_I2C_DeInit(&hi2c1);
+	__HAL_RCC_I2C1_FORCE_RESET();
+	__HAL_RCC_I2C1_RELEASE_RESET();
+	HAL_I2C_Init(&hi2c1);
+	HAL_I2C_EnableListen_IT(&hi2c1);
 }

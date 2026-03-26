@@ -271,9 +271,19 @@ int main(void) {
 	lcd_backlight_on();
 
 	while (1) {
-		// Re-arm I2CS in case of lost master signal
-		if (i2cs_state != I2CS_STATE_IDLE && ((uptime_ms() - i2cs_rearm_counter) > I2CS_REARM_TIMEOUT))
+		// Re-arm I2CS in wrong case scenarios
+		if ((i2cs_state != I2CS_STATE_IDLE && ((uptime_ms() - i2cs_rearm_counter) > I2CS_REARM_TIMEOUT)) ||
+			HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_ERROR
+		) {
+			if (i2cs_state == I2CS_STATE_REG_REQUEST)
+				led_blink_configure(3, 1);
+			else if (i2cs_state == I2CS_STATE_REG_RECEIVE)
+				led_blink_configure(2, 1);
+			else
+				led_blink_configure(1, 1);
+			HAL_Interface_I2C1_reset();
 			i2cs_state = I2CS_STATE_IDLE;
+		}
 
 		reg_sync();
 		check_rtc_bck_sync();
@@ -284,6 +294,9 @@ int main(void) {
 		rst_ctrl_reg_check();
 		off_ctrl_reg_check();
 		led_blink_refresh();
+
+		HAL_RTC_GetDate(&hrtc, &rtc_date._s, RTC_FORMAT_BIN);
+		HAL_RTC_GetTime(&hrtc, &rtc_time._s, RTC_FORMAT_BIN);
 
 		// If power off is requested, override sleep mode. TODO: transform to FSM instead
 		if (pwr_off_active == 1) {
@@ -300,6 +313,7 @@ int main(void) {
 				// Prepare peripherals to the low-power mode
 				force_rtc_bck_sync();
 				sys_stop_pico();
+				keycb_start = 0;
 				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 				sys_prepare_sleep();
 
@@ -319,6 +333,7 @@ int main(void) {
 				// Keyboard reset for detecting boot key press
 				fifo_flush();
 				keyboard_reset();
+				keycb_start = 1;
 				keyboard_process();
 				sys_start_pico();
 			}
@@ -704,11 +719,11 @@ __STATIC_INLINE void rst_ctrl_reg_check(void) {
     AXP2101_disableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ);
 
     HAL_Delay(300);		// Wait for final I2C answer
-	if (HAL_I2C_DisableListen_IT(&hi2c1) != HAL_OK)
-		Error_Handler();
+    HAL_I2C_DisableListen_IT(&hi2c1);
 
 	reg_set_value(REG_ID_RST, 0);
 	sys_stop_pico();
+	keycb_start = 0;
 
 	if (delay_mode == CFG_RST_DELAY_1S)
 		HAL_Delay(1000);
@@ -723,11 +738,12 @@ __STATIC_INLINE void rst_ctrl_reg_check(void) {
         // Keyboard reset for detecting boot key press
         fifo_flush();
         keyboard_reset();
+        keycb_start = 1;
         keyboard_process();
 
-		if (HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
-			if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
-				HAL_Interface_I2C1_reset();
+		if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+			HAL_Interface_I2C1_reset();
+
 		AXP2101_enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ);
 
 		sys_start_pico();
@@ -752,6 +768,8 @@ __STATIC_INLINE void off_ctrl_reg_check(void) {
 
 __STATIC_INLINE void sys_prepare_sleep(void) {
 	LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	keycb_start = 0;
 
 	// Put PMIC in low-trigger mode
 	AXP2101_disableIRQ(XPOWERS_AXP2101_ALL_IRQ);
@@ -790,9 +808,8 @@ __STATIC_INLINE void sys_wake_sleep(void) {
 	LL_GPIO_ResetOutputPin(SYS_LED_GPIO_Port, SYS_LED_Pin);
 
 	// Enable I2C slave
-	if (HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
-		if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
-			HAL_Interface_I2C1_reset();
+	if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+		HAL_Interface_I2C1_reset();
 
 	// Restart backlights PWM
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
@@ -813,6 +830,7 @@ __STATIC_INLINE void sys_wake_sleep(void) {
 	// Keyboard reset for detecting boot key press
 	fifo_flush();
 	keyboard_reset();
+	keycb_start = 1;
 	keyboard_process();
 }
 

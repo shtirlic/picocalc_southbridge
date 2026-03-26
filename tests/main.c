@@ -148,7 +148,7 @@ static void RTC_disp(PCSB_RTC_DATE_STRUCT* const rtc_date, PCSB_RTC_TIME_STRUCT*
         lcd_printf_string("RTC check: %s %02d/%02d/%04d", &dayOfWeekLUT[rtc_date->dayOfWeek-1], rtc_date->day, rtc_date->month, 2000 + rtc_date->year);
     else {
         lcd_print_string("SB-RTC>-[NOK]> R-REG-DATE!\n");
-        lcd_printf_string("RAW: %08X\n", rtc_date->raw);
+        lcd_printf_string("RAW: %08X Err: %d\n", rtc_date->raw, result);
     }
 
     result = pcsb_rtc_read_time(rtc_time);
@@ -156,7 +156,7 @@ static void RTC_disp(PCSB_RTC_DATE_STRUCT* const rtc_date, PCSB_RTC_TIME_STRUCT*
         lcd_printf_string(" - %02d:%02d:%02d\n", rtc_time->hours, rtc_time->minutes, rtc_time->secondes);
     else {
         lcd_print_string("\nSB-RTC>-[NOK]> R-REG-TIME!\n");
-        lcd_printf_string("RAW: %08X\n", rtc_time->raw);
+        lcd_printf_string("RAW: %08X Err: %d\n", rtc_time->raw, result);
     }
 }
 
@@ -243,6 +243,7 @@ int main() {
 			    lcd_printf_string("KBD FIFO read failure! (%d)\n", c);
                 ++i2c_err_cnt;
             }
+            sleep_ms(2000);
 		} else if(c != -1 && c > 0) {
             if (i2c_err_cnt > 7) {
                 lcd_printf_string("SB-KBD> link restored.\n", c);

@@ -4,7 +4,7 @@
 #define PCSB_I2C_SDA    6
 #define PCSB_I2C_SCL    7
 
-#define PCSB_I2C_SPEED  10000
+#define PCSB_I2C_SPEED  100000
 
 
 static uint8_t pcsb_inited = 0;
@@ -21,8 +21,6 @@ uint32_t pcsb_init(const PCSB_REGS_ADDR_TABLE* const addr_table_override, const 
     gpio_set_function(PCSB_I2C_SCL, GPIO_FUNC_I2C);
     gpio_set_function(PCSB_I2C_SDA, GPIO_FUNC_I2C);
     i2c_speed = i2c_init(PCSB_I2C_MOD, PCSB_I2C_SPEED);
-    //gpio_pull_up(PCSB_I2C_SCL);
-    //gpio_pull_up(PCSB_I2C_SDA);
 
     pcsb_inited = 1;
 	
@@ -69,12 +67,14 @@ int _int_i2c_op(const uint8_t* in_buff, const size_t in_size, uint8_t* out_buff,
     if (retval == PICO_ERROR_GENERIC || retval == PICO_ERROR_TIMEOUT)
         return retval;
 
-    sleep_ms(16);
+    //sleep_us(100);
+    //sleep_ms(16);
     retval = i2c_read_timeout_us(PCSB_I2C_MOD, PCSB_I2C_ADDR, out_buff, out_size, false, 200000);
     if (retval == PICO_ERROR_GENERIC || retval == PICO_ERROR_TIMEOUT)
         return retval;
 
-    sleep_ms(16);
+    sleep_us(200);
+    //sleep_ms(16);
     return 0;
 }
 

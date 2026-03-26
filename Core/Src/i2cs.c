@@ -28,19 +28,21 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 		if (AddrMatchCode != 0x3E)	// 0x1F << 1
 			return;
 
-		if (TransferDirection == I2C_DIRECTION_TRANSMIT) {
+		if (TransferDirection == I2C_DIRECTION_TRANSMIT) {		// Remote master want to transmit data
 			if (i2cs_state == I2CS_STATE_IDLE) {
 				i2cs_state = I2CS_STATE_REG_REQUEST;
 
+				// expecting 1 byte register address
 				i2cs_r_idx = 0;
-				HAL_I2C_Slave_Sequential_Receive_IT(hi2c, i2cs_r_buff, 1, I2C_FIRST_FRAME);	// This write the first received byte to i2cs_r_buff[0]
+				i2cs_r_buff[0] = 0;	// Purge previous datas from failed attempt
+				HAL_I2C_Slave_Seq_Receive_IT(hi2c, i2cs_r_buff, 1, I2C_FIRST_FRAME);
 
 				i2cs_rearm_counter = uptime_ms();
 			}
 		}
 
-		if (TransferDirection == I2C_DIRECTION_RECEIVE) {
-			if (i2cs_state == I2CS_STATE_REG_REQUEST) {
+		if (TransferDirection == I2C_DIRECTION_RECEIVE) {		// Remote master want to receive data
+			if (i2cs_state == I2CS_STATE_REG_REQUEST || i2cs_state == I2CS_STATE_REG_RECEIVE) {
 				const uint8_t is_write = (uint8_t)(i2cs_r_buff[0] & (1 << 7));
 				const uint8_t reg = (uint8_t)(i2cs_r_buff[0] & ~(1 << 7));
 
@@ -69,7 +71,6 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 						reg_set_value(REG_ID_DEB, 0);	// Trig async flag for EEPROM saving
 					}
 					*((uint16_t*)&i2cs_w_buff[1]) = keyboard_get_hold_period();
-
 					i2cs_w_len = 3;
 				} else if (reg == REG_ID_FRQ) {
 					if (is_write)
@@ -98,43 +99,33 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 					}
 					i2cs_w_buff[1] = reg_get_value(REG_ID_RTC_CFG);
 				} else if (reg == REG_ID_RTC_DATE) {
-					RTC_DateTypeDef date_s = {0};
 					if (is_write) {
-						i2cs_RTC_date_from_buffer(&date_s, &i2cs_r_buff[1]);
+						i2cs_RTC_date_from_buffer(&rtc_date._s, &i2cs_r_buff[1]);
 
-						HAL_RTC_SetDate(&hrtc, &date_s, RTC_FORMAT_BIN);
-						force_rtc_bck_sync();
+						HAL_RTC_SetDate(&hrtc, &rtc_date._s, RTC_FORMAT_BIN);		//TODO: update RTC outside IRQ, add event flag
+						//force_rtc_bck_sync();
 					}
-
-					HAL_RTC_GetDate(&hrtc, &date_s, RTC_FORMAT_BIN);
-					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &date_s);
-
+					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &rtc_date._s);
 					i2cs_w_len = 5;
 				} else if (reg == REG_ID_RTC_TIME) {
-					RTC_TimeTypeDef time_s = {0};
 					if (is_write) {
-						i2cs_RTC_time_from_buffer(&time_s, &i2cs_r_buff[1]);
+						i2cs_RTC_time_from_buffer(&rtc_time._s, &i2cs_r_buff[1]);
 
-						HAL_RTC_SetTime(&hrtc, &time_s, RTC_FORMAT_BIN);
+						HAL_RTC_SetTime(&hrtc, &rtc_time._s, RTC_FORMAT_BIN);		//TODO: update RTC outside IRQ, add event flag
 					}
-
-					HAL_RTC_GetTime(&hrtc, &time_s, RTC_FORMAT_BIN);
-					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &time_s);
-
+					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &rtc_time._s);
 					i2cs_w_len = 4;
 				} else if (reg == REG_ID_RTC_ALARM_DATE) {
 					if (is_write)
 						i2cs_RTC_date_from_buffer(&rtc_alarm_date._s, &i2cs_r_buff[1]);
 
 					i2cs_fill_buffer_RTC_date(&i2cs_w_buff[1], &rtc_alarm_date._s);
-
 					i2cs_w_len = 5;
 				} else if (reg == REG_ID_RTC_ALARM_TIME) {
 					if (is_write)
 						i2cs_RTC_time_from_buffer(&rtc_alarm_time._s, &i2cs_r_buff[1]);
 
 					i2cs_fill_buffer_RTC_time(&i2cs_w_buff[1], &rtc_alarm_time._s);
-
 					i2cs_w_len = 4;
 				} else if (reg == REG_ID_KEY) {
 					i2cs_w_buff[0] = fifo_count();
@@ -158,14 +149,15 @@ extern void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirect
 						reg_set_value(REG_ID_OFF, i2cs_r_buff[1]);
 					i2cs_w_buff[1] = reg_get_value(REG_ID_OFF);
 				} else {
-					i2cs_w_buff[0] = 0;
-					i2cs_w_buff[1] = 0;
+					i2cs_w_buff[0] = 0xDE;
+					i2cs_w_buff[1] = 0xAD;
 				}
 
 				i2cs_state = I2CS_STATE_REG_ANSWER;
 				i2cs_w_idx = 0;
 
-				HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, i2cs_w_buff, i2cs_w_len, I2C_FIRST_AND_LAST_FRAME);
+				// Send the corresponding register bytes to the master
+				HAL_I2C_Slave_Seq_Transmit_IT(hi2c, i2cs_w_buff, i2cs_w_len, I2C_LAST_FRAME);
 
 				i2cs_rearm_counter = uptime_ms();
 			}
@@ -182,30 +174,38 @@ extern void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 			const uint8_t reg = (uint8_t)(i2cs_r_buff[0] & ~(1 << 7));
 			uint8_t bytes_needed = 0;
 
-			// Check for another mandatories bytes depending on register requested
-			if (reg == REG_ID_BKL ||
-				reg == REG_ID_BK2 ||
-				reg == REG_ID_RST ||
-				reg == REG_ID_OFF ||
-				reg == REG_ID_SYS_CFG ||
-				reg == REG_ID_INT_CFG ||
-				reg == REG_ID_FRQ) {
-				if (is_write)
-					bytes_needed = 1;
-			} else if (reg == REG_ID_DEB) {
-				if (is_write)
-					bytes_needed = 2;
-			} else if (reg == REG_ID_RTC_DATE ||
+			i2cs_state = I2CS_STATE_REG_RECEIVE;
+
+			if (is_write) {
+				// Check for another mandatories bytes depending on register requested
+				if (reg == REG_ID_BKL ||
+					reg == REG_ID_BK2 ||
+					reg == REG_ID_RST ||
+					reg == REG_ID_OFF ||
+					reg == REG_ID_SYS_CFG ||
+					reg == REG_ID_INT_CFG ||
+					reg == REG_ID_FRQ) {
+						bytes_needed = 1;
+				} else if (reg == REG_ID_DEB) {
+						bytes_needed = 2;
+				} else if (reg == REG_ID_RTC_DATE ||
 					reg == REG_ID_RTC_ALARM_DATE ||
 					reg == REG_ID_RTC_TIME ||
 					reg == REG_ID_RTC_ALARM_TIME) {
-				if (is_write)
-					bytes_needed = 3;
-			}
+						bytes_needed = 3;
+				}
 
-			if (bytes_needed > 0)
-				HAL_I2C_Slave_Sequential_Receive_IT(hi2c, i2cs_r_buff + i2cs_r_idx, bytes_needed, I2C_NEXT_FRAME);	// This write the second or more received byte to i2cs_r_buff[1]
+				// Wait for the remaining bytes from the master
+				//HAL_I2C_Slave_Seq_Receive_IT(hi2c, i2cs_r_buff + i2cs_r_idx, bytes_needed, I2C_NEXT_FRAME);
+				HAL_I2C_Slave_Seq_Receive_IT(hi2c, i2cs_r_buff + 1, bytes_needed, I2C_NEXT_FRAME);
+			}
 		}
+	}
+}
+
+extern void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	if (hi2c == &hi2c1) {
+		i2cs_w_idx++;
 	}
 }
 
@@ -218,11 +218,21 @@ extern void HAL_I2C_ListenCpltCallback (I2C_HandleTypeDef *hi2c) {
 	}
 }
 
+extern void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c) {
+	if (hi2c == &hi2c1) {
+		i2cs_state = I2CS_STATE_IDLE;
+		HAL_I2C_EnableListen_IT(hi2c);
+	}
+}
+
 extern void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
-	if (hi2c == &hi2c1)
+	if (hi2c == &hi2c1) {
 		if (HAL_I2C_GetError(hi2c) != HAL_I2C_ERROR_AF) {
-			//Error_Handler();
-			// Actually this will trigger the watchdog and restart the system... That can ruin the day of the user.
-			NVIC_SystemReset();
+			HAL_I2C_DeInit(hi2c);
+			HAL_I2C_Init(hi2c);
+			i2cs_state = I2CS_STATE_IDLE;
+			i2cs_r_idx = 0;
 		}
+		HAL_I2C_EnableListen_IT(hi2c);
+	}
 }
