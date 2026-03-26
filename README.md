@@ -12,7 +12,7 @@ This include:
 - switch backend lib stm32duino to STM32HAL. It's help reducing binary size (~25 KB) and allow more features to be implemented that way,
 - added configuration saving solution (using internal flash, including backlight option),
 - internal RTC access through dedicated I2C registers,
-- main MCU (pico) reset using power button (Shift + short press on PWR button),
+- main MCU (pico) reset using power button (Shift + **short press** on PWR button),
 - lighten components drivers,
 - auto wake-up using RTC (WIP)...
 
