@@ -109,6 +109,10 @@ uint32_t AXP2101_disableTSPinMeasure(void) {
 	return clrRegisterBit(XPOWERS_AXP2101_ADC_CHANNEL_CTRL, 1);
 }
 
+uint32_t AXP2101_enablePwrOffAfterOffDelay(void) {
+	return setRegisterBit(XPOWERS_AXP2101_PWROFF_EN, 1);
+}
+
 uint32_t AXP2101_enableBattDetection(void) {
 	return setRegisterBit(XPOWERS_AXP2101_BAT_DET_CTRL, 0);
 }
@@ -201,6 +205,32 @@ uint8_t AXP2101_isBatChargeStartIrq(void) {
 	return 0;
 }
 
+
+uint32_t AXP2101_setPowerOnPressDelay(uint8_t value) {
+	uint8_t reg_value = 0;
+	HAL_StatusTypeDef status;
+
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_IRQ_OFF_ON_LEVEL_CTRL, 1, &reg_value, 1, 60);
+	if (status != HAL_OK)
+		return 1;
+
+	reg_value &= 0xFC;
+	reg_value |= (value & 0x3);
+	return (uint32_t)HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_IRQ_OFF_ON_LEVEL_CTRL, 1, &reg_value, 1, 60);
+}
+
+uint32_t AXP2101_setPowerOffPressDelay(uint8_t value) {
+	uint8_t reg_value = 0;
+	HAL_StatusTypeDef status;
+
+	status = HAL_I2C_Mem_Read(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_IRQ_OFF_ON_LEVEL_CTRL, 1, &reg_value, 1, 60);
+	if (status != HAL_OK)
+		return 1;
+
+	reg_value &= 0xF3;
+	reg_value |= (value & 0x3) << 2;
+	return (uint32_t)HAL_I2C_Mem_Write(&hi2c2, AXP2101_DEV_I2C_ID, XPOWERS_AXP2101_IRQ_OFF_ON_LEVEL_CTRL, 1, &reg_value, 1, 60);
+}
 
 // value in mV
 uint32_t AXP2101_setSysPowerDownVoltage(uint16_t value) {

@@ -36,12 +36,22 @@
 
 //#define XPOWERS_AXP2101_PWRON_STATUS                     (0x20)
 //#define XPOWERS_AXP2101_PWROFF_STATUS                    (0x21)
-//#define XPOWERS_AXP2101_PWROFF_EN                        (0x22)
+#define XPOWERS_AXP2101_PWROFF_EN                        (0x22)
 //#define XPOWERS_AXP2101_DC_OVP_UVP_CTRL                  (0x23)
 #define XPOWERS_AXP2101_VOFF_SET                         (0x24)
 //#define XPOWERS_AXP2101_PWROK_SEQU_CTRL                  (0x25)
 //#define XPOWERS_AXP2101_SLEEP_WAKEUP_CTRL                (0x26)
-//#define XPOWERS_AXP2101_IRQ_OFF_ON_LEVEL_CTRL            (0x27)
+#define XPOWERS_AXP2101_IRQ_OFF_ON_LEVEL_CTRL            (0x27)
+
+#define XPOWERS_AXP2101_OFF_LVL_4S						 (0x0)
+#define XPOWERS_AXP2101_OFF_LVL_6S						 (0x1)
+#define XPOWERS_AXP2101_OFF_LVL_8S						 (0x2)
+#define XPOWERS_AXP2101_OFF_LVL_10S						 (0x3)
+
+#define XPOWERS_AXP2101_ON_LVL_128MS					 (0x0)
+#define XPOWERS_AXP2101_ON_LVL_512MS					 (0x1)
+#define XPOWERS_AXP2101_ON_LVL_1S						 (0x2)
+#define XPOWERS_AXP2101_ON_LVL_2S						 (0x3)
 
 //#define XPOWERS_AXP2101_FAST_PWRON_SET0                  (0x28)
 //#define XPOWERS_AXP2101_FAST_PWRON_SET1                  (0x29)
@@ -312,6 +322,7 @@ typedef enum {
 
 uint32_t AXP2101_shutdown(void);
 uint32_t AXP2101_disableTSPinMeasure(void);
+uint32_t AXP2101_enablePwrOffAfterOffDelay(void);
 uint32_t AXP2101_enableBattDetection(void);
 uint32_t AXP2101_enableBattVoltageMeasure(void);
 uint32_t AXP2101_enableSystemVoltageMeasure(void);
@@ -331,6 +342,8 @@ uint8_t AXP2101_isBatChargeStartIrq(void);
 
 uint32_t AXP2101_setLowBatWarnThreshold(uint8_t percentage);
 uint32_t AXP2101_setLowBatShutdownThreshold(uint8_t opt);
+uint32_t AXP2101_setPowerOnPressDelay(uint8_t value);
+uint32_t AXP2101_setPowerOffPressDelay(uint8_t value);
 uint32_t AXP2101_setSysPowerDownVoltage(uint16_t value);
 uint32_t AXP2101_setChargingLedMode(uint8_t mode);
 

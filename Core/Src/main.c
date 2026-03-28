@@ -77,6 +77,7 @@ extern UART_HandleTypeDef huart3;
 // Some globals/internals counters
 volatile uint32_t systicks_counter = 0;		// 1 MHz systick counter
 static uint32_t pmu_check_counter = 0;
+static uint8_t uninhibit_pwr_button = 0;
 static volatile uint32_t off_delay_counter = 0;
 
 // Global status - TODO: Combine status registers, clean up
@@ -221,6 +222,9 @@ int main(void) {
 	// cause abnormal charging
 	AXP2101_setSysPowerDownVoltage(2800);
 	AXP2101_disableTSPinMeasure();
+	AXP2101_setPowerOnPressDelay(XPOWERS_AXP2101_ON_LVL_512MS);
+	AXP2101_setPowerOffPressDelay(XPOWERS_AXP2101_OFF_LVL_10S);
+	AXP2101_enablePwrOffAfterOffDelay();
 	// AXP2101_enableTemperatureMeasure();
 	AXP2101_enableBattDetection();
 	AXP2101_enableVbusVoltageMeasure();
@@ -310,6 +314,7 @@ int main(void) {
 		// Execute stop/sleep mode if requested
 		else if (stop_mode_active == 1) {
 			if (uptime_ms() >= off_delay_counter) {
+				reg_unset_bit(REG_ID_OFF, OFF_CTRL_SLEEP);
 				// Prepare peripherals to the low-power mode
 				force_rtc_bck_sync();
 				sys_stop_pico();
@@ -320,8 +325,6 @@ int main(void) {
 				// Low-power mode entry
 				HAL_SuspendTick();
 				HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_STOPENTRY_WFI);
-				stop_mode_active = 0;
-				reg_unset_bit(REG_ID_OFF, OFF_CTRL_SLEEP);
 				SystemClock_Config();
 				HAL_ResumeTick();
 				HAL_Delay(300);
@@ -336,6 +339,7 @@ int main(void) {
 				keycb_start = 1;
 				keyboard_process();
 				sys_start_pico();
+				stop_mode_active = 0;
 			}
 		}
 	}
@@ -521,10 +525,9 @@ __STATIC_INLINE void check_pmu_int(void) {
 	if (!pmu_online)
 		return;
 
-	static uint8_t uninhibit_pwr_button = 0;
 	uint8_t pcnt;
 
-	if (uptime_ms() - pmu_check_counter > 2000) {
+	if (uptime_ms() - pmu_check_counter > 10000) {
 		pmu_check_counter = uptime_ms();  // reset time
 
 		// Remove start-up inhibit on
@@ -653,7 +656,8 @@ __STATIC_INLINE void check_pmu_int(void) {
 			//uint8_t data[4] = {1, 2, 3, 4};
 			//PMU.writeDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
 
-			if (stop_mode_active == 0) {
+			if (stop_mode_active == 0 && uninhibit_pwr_button == 1) {
+				uninhibit_pwr_button = 0;
 				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 				stop_mode_active = 1;
 			}
@@ -716,8 +720,6 @@ __STATIC_INLINE void rst_ctrl_reg_check(void) {
     if (rst_reg == 0)
     	return;
 
-    AXP2101_disableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ);
-
     HAL_Delay(300);		// Wait for final I2C answer
     HAL_I2C_DisableListen_IT(&hi2c1);
 
@@ -744,8 +746,6 @@ __STATIC_INLINE void rst_ctrl_reg_check(void) {
 		if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
 			HAL_Interface_I2C1_reset();
 
-		AXP2101_enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ);
-
 		sys_start_pico();
 	} else if (rst_reg == RST_CTRL_FULL_RST) {
 		NVIC_SystemReset();
@@ -755,6 +755,8 @@ __STATIC_INLINE void rst_ctrl_reg_check(void) {
 __STATIC_INLINE void off_ctrl_reg_check(void) {
 	if (!(pwr_off_active || stop_mode_active)) {
 		if (reg_get_value(REG_ID_OFF) & 0xC0) {
+			uninhibit_pwr_button = 0;
+
 			if (reg_is_bit_set(REG_ID_OFF, OFF_CTRL_SHUTDOWN))
 				pwr_off_active = 1;
 			else if (reg_is_bit_set(REG_ID_OFF, OFF_CTRL_SLEEP))
