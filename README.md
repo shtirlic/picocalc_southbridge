@@ -1,4 +1,4 @@
-# PicoCalc "southbridge" custom BIOS
+# [PicoCalc](https://www.clockworkpi.com/picocalc) "southbridge" custom BIOS
 
 This is my personnal rewrite of the [original](https://github.com/clockworkpi/PicoCalc/tree/master/Code/picocalc_keyboard)
 PicoCalc STM32F103R8T6 firmware.
@@ -18,10 +18,12 @@ This include:
 
 ## Tools version
 
-- ARM GNU GCC: 14.3-rel1_arm-none-eabi (but STM32 one can do the job too)
+- ARM GCC: 14.3-rel1_arm-none-eabi (but STM32 one can do the job too)
 
 ## Compile
 This source code can be compiled using ARM/STM32 gcc toolchain in path and using make program.
+
+(Build tested on Windows and Debian based system)
 
 ```
 git clone --recurse-submodules https://git.jcsmith.fr/jackcartersmith/picocalc_BIOS.git

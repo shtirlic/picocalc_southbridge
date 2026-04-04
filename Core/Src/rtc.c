@@ -16,7 +16,7 @@ extern void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc) {
 	// Needed to fetch the good date from wake-up
 	force_rtc_bck_load();
 
-	if ((rtc_conf & RTC_CFG_DATE_ALARM) == RTC_CFG_DATE_ALARM) {
+	if (rtc_alarm_date.raw != 0) {
 		HAL_RTC_GetDate(hrtc, &date_s, RTC_FORMAT_BIN);
 		if (date_s.Year != rtc_alarm_date._s.Year ||
 			date_s.Month != rtc_alarm_date._s.Month ||
@@ -26,7 +26,7 @@ extern void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc) {
 
 	rtc_stop_alarm();
 	if (date_valid == 1) {
-		if ((rtc_conf & RTC_CFG_REARM) == RTC_CFG_REARM)
+		if ((rtc_conf & RTC_CFG_ALARM_REARM) == RTC_CFG_ALARM_REARM)
 			rtc_run_alarm();
 	} else {
 		rtc_run_alarm();

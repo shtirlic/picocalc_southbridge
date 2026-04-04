@@ -4,6 +4,7 @@
 #ifndef RTC_H_
 #define RTC_H_
 
+// Configuration functions ------------------------------------------------------------
 void force_rtc_bck_load(void);
 void force_rtc_bck_sync(void);
 void check_rtc_bck_sync(void);
@@ -12,6 +13,7 @@ void i2cs_fill_buffer_RTC_time(uint8_t* const buff, const volatile RTC_TimeTypeD
 void i2cs_RTC_date_from_buffer(volatile RTC_DateTypeDef* const date_s, const uint8_t* const buff);
 void i2cs_RTC_time_from_buffer(volatile RTC_TimeTypeDef* const time_s, const uint8_t* const buff);
 
+// Start-stop functions ---------------------------------------------------------------
 uint32_t rtc_run_alarm(void);
 uint32_t rtc_stop_alarm(void);
 

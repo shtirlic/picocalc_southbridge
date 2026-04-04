@@ -40,6 +40,8 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
 #endif
 
+volatile uint32_t systicks_counter = 0;		// 1 MHz systick counter
+
 volatile uint8_t rtc_reg_xor_events = 0;
 volatile RTC_TimeTypeDef_u rtc_time = {.raw = 0x00000000}, rtc_alarm_time = {.raw = 0x00000000};
 volatile RTC_DateTypeDef_u rtc_date = {.raw = 0x00010101}, rtc_alarm_date = {.raw = 0x00010101};

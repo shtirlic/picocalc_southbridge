@@ -132,7 +132,7 @@ extern "C" {
 #define KBD_BCKL_STEPS 4
 
 
-// Structure definition ---------------------------------------------------------------
+// Structure declaration ---------------------------------------------------------------
 typedef union {
     uint32_t raw;
     RTC_TimeTypeDef _s;
@@ -144,7 +144,7 @@ typedef union {
 } RTC_DateTypeDef_u;
 
 
-// Global variables definition --------------------------------------------------------
+// Global variables declaration --------------------------------------------------------
 extern volatile uint32_t systicks_counter;
 extern volatile uint8_t pmu_irq;
 
@@ -153,7 +153,7 @@ extern volatile RTC_TimeTypeDef_u rtc_time, rtc_alarm_time;
 extern volatile RTC_DateTypeDef_u rtc_date, rtc_alarm_date;
 
 
-// Global functions definition --------------------------------------------------------
+// Global functions declaration --------------------------------------------------------
 void SystemClock_Config(void);
 HAL_StatusTypeDef HAL_Interface_init(void);
 void HAL_Interface_I2C1_reset(void);
@@ -161,6 +161,15 @@ void HAL_Interface_I2C1_reset(void);
 __STATIC_INLINE uint32_t uptime_ms(void) { return systicks_counter; }
 uint32_t led_blink_configure(const uint8_t blink_nbr, const uint8_t restore_status);
 void led_blink_refresh(void);
+
+__STATIC_INLINE void sys_stop_pico(void) {
+	LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);	// Disable speaker Amp. power
+	LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);		// Disable PICO power
+}
+__STATIC_INLINE void sys_start_pico(void) {
+	LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);		// Enable PICO power
+	LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);	// Enable speaker Amp. power
+}
 
 void Error_Handler(void);
 

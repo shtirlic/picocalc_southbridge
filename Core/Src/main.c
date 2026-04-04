@@ -75,12 +75,11 @@ extern UART_HandleTypeDef huart3;
 #endif
 
 // Some globals/internals counters
-volatile uint32_t systicks_counter = 0;		// 1 MHz systick counter
 static uint32_t pmu_check_counter = 0;
 static uint8_t uninhibit_pwr_button = 0;
 static volatile uint32_t off_delay_counter = 0;
 
-// Global status - TODO: Combine status registers, clean up
+// Global status
 static uint8_t keycb_start = 0;
 static uint32_t head_phone_status = 0;
 volatile uint8_t pmu_irq = 0;
@@ -94,17 +93,12 @@ static void lock_cb(const uint8_t caps_changed, const uint8_t num_changed);
 static void key_cb(char key, enum key_state state);
 static void hw_check_HP_presence(void);
 static void sync_bat(void);
-#ifdef DEBUG
-static void printPMU(void);
-#endif
 static void check_pmu_int(void);
 static void rtc_ctrl_reg_check(void);
 static void rst_ctrl_reg_check(void);
 static void off_ctrl_reg_check(void);
 static void sys_prepare_sleep(void);
 static void sys_wake_sleep(void);
-static void sys_stop_pico(void);
-static void sys_start_pico(void);
 
 extern void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
@@ -158,7 +152,7 @@ int main(void) {
 	if ((uint16_t)result != 0xCA1C) {
 		EEPROM_WriteVariable(EEPROM_VAR_BCKL, (EEPROM_Value)(uint16_t)((DEFAULT_LCD_BL << 8) | DEFAULT_KBD_BL), EEPROM_SIZE16);
 		EEPROM_WriteVariable(EEPROM_VAR_KBD, (EEPROM_Value)(uint32_t)((DEFAULT_KBD_DEB << 16) | DEFAULT_KBD_FREQ), EEPROM_SIZE32);
-		EEPROM_WriteVariable(EEPROM_VAR_CFG, (EEPROM_Value)(uint16_t)(((CFG_USE_MODS | CFG_REPORT_MODS | CFG_RST_DELAY_1S) << 8) | (INT_OVERFLOW | INT_KEY | INT_RTC | INT_PWR_BTN)), EEPROM_SIZE16);
+		EEPROM_WriteVariable(EEPROM_VAR_CFG, (EEPROM_Value)(uint16_t)(((CFG_EEPROM_SAVE_CFG | CFG_USE_MODS | CFG_REPORT_MODS | CFG_RST_DELAY_1S) << 8) | (INT_OVERFLOW | INT_KEY | INT_RTC | INT_PWR_BTN)), EEPROM_SIZE16);
 		EEPROM_WriteVariable(EEPROM_VAR_ID, (EEPROM_Value)(uint16_t)0xCA1C, EEPROM_SIZE16);
 #ifdef DEBUG
 		DEBUG_UART_MSG("EEPROM first start!\n\r");
@@ -320,6 +314,7 @@ int main(void) {
 				sys_stop_pico();
 				keycb_start = 0;
 				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
+				uninhibit_pwr_button = 0;
 				sys_prepare_sleep();
 
 				// Low-power mode entry
@@ -450,77 +445,6 @@ __STATIC_INLINE void sync_bat(void) {
 	reg_set_value(REG_ID_BAT, pcnt);
 }
 
-#ifdef DEBUG
-__STATIC_INLINE void printPMU(void) {
-	DEBUG_UART_MSG("PMU isCharging: ");
-	if (AXP2101_isCharging())
-		DEBUG_UART_MSG("YES\n\r");
-	else
-		DEBUG_UART_MSG( "NO\n\r");
-
-	DEBUG_UART_MSG("PMU isDischarge: ");
-	if (AXP2101_isDischarge())
-		DEBUG_UART_MSG("YES\n\r");
-	else
-		DEBUG_UART_MSG( "NO\n\r");
-
-	DEBUG_UART_MSG("PMU isStandby: ");
-	if (AXP2101_isStandby())
-		DEBUG_UART_MSG("YES\n\r");
-	else
-		DEBUG_UART_MSG( "NO\n\r");
-
-	DEBUG_UART_MSG("PMU isVbusIn: ");
-	if (AXP2101_isVbusIn())
-		DEBUG_UART_MSG("YES\n\r");
-	else
-		DEBUG_UART_MSG( "NO\n\r");
-
-	DEBUG_UART_MSG("PMU isVbusGood: ");
-	if (AXP2101_isVbusGood())
-		DEBUG_UART_MSG("YES\n\r");
-	else
-		DEBUG_UART_MSG( "NO\n\r");
-
-	DEBUG_UART_MSG("PMU getChargerStatus: ");
-	uint8_t charge_status = AXP2101_getChargerStatus();
-	if (charge_status == XPOWERS_AXP2101_CHG_TRI_STATE) {
-		DEBUG_UART_MSG("tri_charge");
-	} else if (charge_status == XPOWERS_AXP2101_CHG_PRE_STATE) {
-		DEBUG_UART_MSG("pre_charge");
-	} else if (charge_status == XPOWERS_AXP2101_CHG_CC_STATE) {
-		DEBUG_UART_MSG("constant charge");
-	} else if (charge_status == XPOWERS_AXP2101_CHG_CV_STATE) {
-		DEBUG_UART_MSG("constant voltage");
-	} else if (charge_status == XPOWERS_AXP2101_CHG_DONE_STATE) {
-		DEBUG_UART_MSG("charge done");
-	} else if (charge_status == XPOWERS_AXP2101_CHG_STOP_STATE) {
-		DEBUG_UART_MSG("not charging");
-	}
-
-	DEBUG_UART_MSG("PMU getBattVoltage: ");
-	DEBUG_UART_MSG2(AXP2101_getBattVoltage(), 2, 0);
-	DEBUG_UART_MSG("mV\n\r");
-	DEBUG_UART_MSG("PMU getVbusVoltage: ");
-	DEBUG_UART_MSG2(AXP2101_getVbusVoltage(), 2, 0);
-	DEBUG_UART_MSG("mV\n\r");
-	DEBUG_UART_MSG("PMU getSystemVoltage: ");
-	DEBUG_UART_MSG2(AXP2101_getSystemVoltage(), 2, 0);
-	DEBUG_UART_MSG("mV\n\r");
-
-	// The battery percentage may be inaccurate at first use, the PMU will
-	// automatically learn the battery curve and will automatically calibrate the
-	// battery percentage after a charge and discharge cycle
-	if (AXP2101_isBatteryConnect()) {
-		DEBUG_UART_MSG("PMU getBatteryPercent: ");
-		uint8_t pcnt = 0;
-		AXP2101_getBatteryPercent(&pcnt);
-		DEBUG_UART_MSG2(pcnt, 1, 0);
-		DEBUG_UART_MSG("%\n\r");
-	}
-}
-#endif
-
 __STATIC_INLINE void check_pmu_int(void) {
 	if (!pmu_online)
 		return;
@@ -634,7 +558,7 @@ __STATIC_INLINE void check_pmu_int(void) {
 
 			printPMU();
 #endif
-			if (stop_mode_active == 0) {
+			if (stop_mode_active == 0 && uninhibit_pwr_button == 1) {
 				// Send the special key to keyboard FIFO, as legacy firmware do
 				key_cb(KEY_POWER, KEY_STATE_PRESSED);
 
@@ -657,7 +581,6 @@ __STATIC_INLINE void check_pmu_int(void) {
 			//PMU.writeDataBuffer(data, XPOWERS_AXP2101_DATA_BUFFER_SIZE);
 
 			if (stop_mode_active == 0 && uninhibit_pwr_button == 1) {
-				uninhibit_pwr_button = 0;
 				AXP2101_setChargingLedMode(XPOWERS_CHG_LED_CTRL_CHG);
 				stop_mode_active = 1;
 			}
@@ -699,16 +622,16 @@ __STATIC_INLINE void check_pmu_int(void) {
 
 __STATIC_INLINE void rtc_ctrl_reg_check(void) {
 	if (rtc_reg_xor_events != 0) {
-		if ((rtc_reg_xor_events & RTC_CFG_RUN_ALARM) == RTC_CFG_RUN_ALARM) {
-			if (reg_get_value(REG_ID_RTC_CFG) & RTC_CFG_RUN_ALARM) {
+		if ((rtc_reg_xor_events & RTC_CFG_ALARM_ENA) == RTC_CFG_ALARM_ENA) {
+			if (reg_get_value(REG_ID_RTC_CFG) & RTC_CFG_ALARM_ENA) {
 				if (rtc_run_alarm() != HAL_OK)
-					reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) & (uint8_t)~RTC_CFG_RUN_ALARM);
+					reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) & (uint8_t)~RTC_CFG_ALARM_ENA);
 			} else {
 				if (rtc_stop_alarm() != HAL_OK)
-					reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) | RTC_CFG_RUN_ALARM);
+					reg_set_value(REG_ID_RTC_CFG, reg_get_value(REG_ID_RTC_CFG) | RTC_CFG_ALARM_ENA);
 			}
 
-			rtc_reg_xor_events &= (uint8_t)~RTC_CFG_RUN_ALARM;
+			rtc_reg_xor_events &= (uint8_t)~RTC_CFG_ALARM_ENA;
 		}
 	}
 }
@@ -834,14 +757,4 @@ __STATIC_INLINE void sys_wake_sleep(void) {
 	keyboard_reset();
 	keycb_start = 1;
 	keyboard_process();
-}
-
-__STATIC_INLINE void sys_stop_pico(void) {
-	LL_GPIO_ResetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);	// Disable speaker Amp. power
-	LL_GPIO_ResetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);		// Disable PICO power
-}
-
-__STATIC_INLINE void sys_start_pico(void) {
-	LL_GPIO_SetOutputPin(PICO_EN_GPIO_Port, PICO_EN_Pin);		// Enable PICO power
-	LL_GPIO_SetOutputPin(SP_AMP_EN_GPIO_Port, SP_AMP_EN_Pin);	// Enable speaker Amp. power
 }
