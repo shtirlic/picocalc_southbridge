@@ -211,6 +211,8 @@ int main(void) {
 	keyboard_set_key_callback(key_cb);
 	keyboard_set_lock_callback(lock_cb);
 
+	if (AXP2101_init_cwpico_regs() != 0)
+		Error_Handler();
 	// It is necessary to disable the detection function of the TS pin on the
 	// board without the battery temperature detection function, otherwise it will
 	// cause abnormal charging

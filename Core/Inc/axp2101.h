@@ -319,7 +319,7 @@ typedef enum {
 #define XPOWERS_AXP2101_ALL_IRQ                  (0xFFFFFFFFUL)
 
 
-
+uint32_t AXP2101_init_cwpico_regs(void);
 uint32_t AXP2101_shutdown(void);
 uint32_t AXP2101_disableTSPinMeasure(void);
 uint32_t AXP2101_enablePwrOffAfterOffDelay(void);

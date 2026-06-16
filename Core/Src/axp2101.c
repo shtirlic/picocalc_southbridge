@@ -5,6 +5,11 @@
 
 #define AXP2101_DEV_I2C_ID	0x68
 
+typedef struct {
+	uint8_t reg;
+	uint8_t val;
+} reg_pair_t;
+
 
 extern I2C_HandleTypeDef hi2c2;
 
@@ -20,6 +25,16 @@ __STATIC_INLINE int8_t readRegister(uint8_t reg, uint8_t *buf, uint8_t length) {
 		return -1;
 
 	return 0;
+}
+
+__STATIC_INLINE int8_t writeRegister8b(uint8_t reg, uint8_t val) {
+	HAL_StatusTypeDef ret;
+
+	ret = HAL_I2C_Mem_Write(&hi2c2,  AXP2101_DEV_I2C_ID, reg, 1, &val, 1, 60);
+	if (ret != HAL_OK)
+		return -1;
+
+	return ret;
 }
 
 __STATIC_INLINE uint16_t readRegisterH6L8(uint8_t highReg, uint8_t lowReg) {
@@ -98,6 +113,45 @@ uint32_t setInterruptImpl(uint32_t opts, uint8_t enable) {
 	}
 
 	return (uint32_t)status;
+}
+
+
+uint32_t AXP2101_init_cwpico_regs(void) {
+	static const reg_pair_t axp_init[] = {
+		{0x12, 0x00},
+		{0x22, 0x04},
+		{0x24, 0x00},
+		{0x25, 0x19},
+		{0x27, 0x16},
+		{0x58, 0x00},
+		{0x50, 0x12},
+		{0x62, 0x13},
+		{0x69, 0x01},
+		{0x80, 0x01},
+		{0x82, 0x12},
+		{0x83, 0x00},
+		{0x84, 0x00},
+		{0x85, 0x00},
+		{0x90, 0x3F},
+		{0x91, 0x00},
+		{0x92, 0x1C},
+		{0x93, 0x1C},
+		{0x94, 0x1C},
+		{0x95, 0x1C},
+		{0x96, 0x1E},
+		{0x97, 0x1E},
+		{0x98, 0x00},
+		{0x99, 0x00},
+		{0x9A, 0x00},
+	};
+    size_t n = sizeof(axp_init)/sizeof(axp_init[0]);
+
+    for (size_t i = 0; i < n; ++i) {
+        if (writeRegister8b(axp_init[i].reg, axp_init[i].val) != 0)
+            return 1;
+    }
+
+    return 0;
 }
 
 
